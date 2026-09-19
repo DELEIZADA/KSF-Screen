@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+<meta charset="UTF-8">
+<title>KSF Screen</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #0f1116;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+#home {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card {
+    width: 460px;
+    background: #181b22;
+    padding: 40px;
+    border-radius: 18px;
+    text-align: center;
+}
+
+h1 {
+    margin: 0 0 10px;
+    font-size: 42px;
+}
+
+.subtitle {
+    color: #9da3ae;
+    margin-bottom: 30px;
+}
+
+button {
+    border: 0;
+    border-radius: 9px;
+    padding: 14px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.primary {
+    background: #5865f2;
+    color: white;
+}
+
+.secondary {
+    background: #2b303b;
+    color: white;
+}
+
+.danger {
+    background: #da373c;
+    color: white;
+}
+
+.full {
+    width: 100%;
+    margin-top: 12px;
+}
+
+input {
+    width: 100%;
+    padding: 15px;
+    margin-top: 12px;
+    background: #101217;
+    border: 1px solid #353b48;
+    border-radius: 9px;
+    color: white;
+    text-align: center;
+    font-size: 18px;
+    text-transform: uppercase;
+}
+
+#room {
+    display: none;
+    height: 100vh;
+    flex-direction: column;
+}
+
+.topbar {
+    height: 72px;
+    background: #181b22;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+}
+
+.room-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+#roomCode {
+    color: #7d87ff;
+    font-size: 21px;
+    letter-spacing: 3px;
+    font-weight: bold;
+}
+
+#status {
+    color: #aab0bb;
+    font-size: 14px;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+}
+
+#stopButton {
+    display: none;
+}
+
+.video-area {
+    flex: 1;
+    padding: 22px;
+    min-height: 0;
+}
+
+.video-box {
+    width: 100%;
+    height: 100%;
+    background: #08090c;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: black;
+}
+
+#emptyMessage {
+    color: #777f8c;
+    text-align: center;
+}
+
+#sourceModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .78);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal {
+    width: 850px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow: auto;
+    background: #181b22;
+    border-radius: 16px;
+    padding: 25px;
+}
+
+.modal h2 {
+    margin-top: 0;
+}
+
+.sources {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fill, minmax(220px, 1fr));
+    gap: 15px;
+}
+
+.source {
+    background: #242832;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 8px;
+    cursor: pointer;
+}
+
+.source:hover {
+    border-color: #5865f2;
+}
+
+.source img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: black;
+    border-radius: 6px;
+}
+
+.source-name {
+    padding: 9px 4px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.modal-bottom {
+    margin-top: 20px;
+    text-align: right;
+}
+</style>
+</head>
+
+<body>
+
+<!-- HOME -->
+
+<div id="home">
+
+<div class="card">
+
+<h1>KSF Screen</h1>
+
+<div class="subtitle">
+Compartilhe sua tela com seus amigos.
+</div>
+
+<button
+id="createButton"
+class="primary full">
+Criar Sala
+</button>
+
+<input
+id="codeInput"
+maxlength="6"
+placeholder="CÓDIGO DA SALA">
+
+<button
+id="joinButton"
+class="secondary full">
+Entrar na Sala
+</button>
+
+</div>
+
+</div>
+
+
+<!-- SALA -->
+
+<div id="room">
+
+<div class="topbar">
+
+<div class="room-info">
+
+<strong>KSF Screen</strong>
+
+<span>
+Sala:
+</span>
+
+<span id="roomCode">
+------
+</span>
+
+<span id="status">
+Conectando...
+</span>
+
+</div>
+
+
+<div class="actions">
+
+<button
+id="shareButton"
+class="primary">
+🖥 Compartilhar Tela
+</button>
+
+<button
+id="stopButton"
+class="danger">
+Parar transmissão
+</button>
+
+</div>
+
+</div>
+
+
+<div class="video-area">
+
+<div class="video-box">
+
+<div id="emptyMessage">
+Nenhuma transmissão ativa.
+</div>
+
+<video
+id="video"
+autoplay
+playsinline>
+</video>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- SELETOR DE TELA -->
+
+<div id="sourceModal">
+
+<div class="modal">
+
+<h2>
+O que você quer compartilhar?
+</h2>
+
+<div
+id="sources"
+class="sources">
+</div>
+
+<div class="modal-bottom">
+
+<button
+id="cancelSource"
+class="secondary">
+Cancelar
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+
+<script>
+
+const { io } =
+    require("socket.io-client");
+
+const { ipcRenderer } =
+    require("electron");
+
+
+/*
+==============================
+ELEMENTOS
+==============================
+*/
+
+const home =
+    document.getElementById("home");
+
+const room =
+    document.getElementById("room");
+
+const createButton =
+    document.getElementById("createButton");
+
+const joinButton =
+    document.getElementById("joinButton");
+
+const codeInput =
+    document.getElementById("codeInput");
+
+const roomCode =
+    document.getElementById("roomCode");
+
+const status =
+    document.getElementById("status");
+
+const shareButton =
+    document.getElementById("shareButton");
+
+const stopButton =
+    document.getElementById("stopButton");
+
+const video =
+    document.getElementById("video");
+
+const emptyMessage =
+    document.getElementById("emptyMessage");
+
+const sourceModal =
+    document.getElementById("sourceModal");
+
+const sourcesContainer =
+    document.getElementById("sources");
+
+const cancelSource =
+    document.getElementById("cancelSource");
+
+
+/*
+==============================
+SOCKET
+==============================
+*/
+
+const socket =
+    io("http://localhost:3000");
+
+
+let currentRoom = null;
+let isHost = false;
+
+let peer = null;
+let localStream = null;
+
+
+/*
+==============================
+CONFIGURAÇÃO WEBRTC
+==============================
+*/
+
+const rtcConfig = {
+
+    iceServers: [
+
+        {
+            urls:
+                "stun:stun.l.google.com:19302"
+        },
+
+        {
+            urls:
+                "stun:stun1.l.google.com:19302"
+        }
+
+    ]
+
+};
+
+
+/*
+==============================
+CÓDIGO DA SALA
+==============================
+*/
+
+function generateRoomCode() {
+
+    const chars =
+        "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    let code = "";
+
+    for (let i = 0; i < 6; i++) {
+
+        code += chars[
+            Math.floor(
+                Math.random() *
+                chars.length
+            )
+        ];
+
+    }
+
+    return code;
+}
+
+
+/*
+==============================
+MOSTRAR SALA
+==============================
+*/
+
+function showRoom(code) {
+
+    currentRoom = code;
+
+    roomCode.textContent = code;
+
+    home.style.display = "none";
+
+    room.style.display = "flex";
+}
+
+
+/*
+==============================
+CRIAR SALA
+==============================
+*/
+
+createButton.onclick = () => {
+
+    const code =
+        generateRoomCode();
+
+    isHost = true;
+
+    showRoom(code);
+
+    status.textContent =
+        "Criando sala...";
+
+    socket.emit(
+        "create-room",
+        code
+    );
+};
+
+
+/*
+==============================
+ENTRAR
+==============================
+*/
+
+joinButton.onclick = () => {
+
+    const code =
+        codeInput.value
+            .trim()
+            .toUpperCase();
+
+    if (code.length !== 6) {
+
+        alert(
+            "Digite um código de 6 caracteres."
+        );
+
+        return;
+    }
+
+    isHost = false;
+
+    showRoom(code);
+
+    status.textContent =
+        "Entrando...";
+
+    socket.emit(
+        "join-room",
+        code
+    );
+};
+
+
+/*
+==============================
+SOCKET - SALA
+==============================
+*/
+
+socket.on(
+    "room-created",
+    () => {
+
+        status.textContent =
+            "Aguardando amigo...";
+    }
+);
+
+
+socket.on(
+    "room-joined",
+    () => {
+
+        status.textContent =
+            "Conectado!";
+    }
+);
+
+
+socket.on(
+    "friend-joined",
+    () => {
+
+        status.textContent =
+            "Amigo conectado!";
+    }
+);
+
+
+socket.on(
+    "friend-left",
+    () => {
+
+        status.textContent =
+            "Amigo desconectado.";
+
+        closePeer();
+    }
+);
+
+
+socket.on(
+    "host-left",
+    () => {
+
+        status.textContent =
+            "O dono saiu da sala.";
+
+        closePeer();
+    }
+);
+
+
+socket.on(
+    "room-error",
+    message => {
+
+        alert(message);
+
+        room.style.display = "none";
+        home.style.display = "flex";
+    }
+);
+
+
+/*
+==============================
+CRIAR WEBRTC PEER
+==============================
+*/
+
+function createPeer() {
+
+    if (peer) {
+        peer.close();
+    }
+
+    peer =
+        new RTCPeerConnection(
+            rtcConfig
+        );
+
+
+    peer.onicecandidate =
+        event => {
+
+            if (event.candidate) {
+
+                socket.emit(
+                    "signal",
+                    {
+                        type: "ice",
+                        candidate:
+                            event.candidate
+                    }
+                );
+
+            }
+
+        };
+
+
+    peer.onconnectionstatechange =
+        () => {
+
+            if (!peer) return;
+
+            console.log(
+                "WebRTC:",
+                peer.connectionState
+            );
+
+            if (
+                peer.connectionState ===
+                "connected"
+            ) {
+
+                status.textContent =
+                    "Transmissão conectada!";
+            }
+
+        };
+
+
+    peer.ontrack =
+        event => {
+
+            const remoteStream =
+                event.streams[0];
+
+            video.srcObject =
+                remoteStream;
+
+            video.muted = false;
+
+            video.style.display =
+                "block";
+
+            emptyMessage.style.display =
+                "none";
+
+            status.textContent =
+                "Assistindo transmissão!";
+        };
+
+
+    return peer;
+}
+
+
+/*
+==============================
+AMIGO PRONTO PARA RECEBER
+==============================
+*/
+
+socket.on(
+    "friend-joined",
+    async () => {
+
+        if (
+            isHost &&
+            localStream
+        ) {
+
+            await startOffer();
+
+        }
+
+    }
+);
+
+
+/*
+==============================
+SINALIZAÇÃO WEBRTC
+==============================
+*/
+
+socket.on(
+    "signal",
+    async data => {
+
+        try {
+
+            if (
+                data.type === "offer"
+            ) {
+
+                const p =
+                    createPeer();
+
+                await p.setRemoteDescription(
+                    data.sdp
+                );
+
+                const answer =
+                    await p.createAnswer();
+
+                await p.setLocalDescription(
+                    answer
+                );
+
+                socket.emit(
+                    "signal",
+                    {
+                        type: "answer",
+                        sdp:
+                            p.localDescription
+                    }
+                );
+
+            }
+
+
+            else if (
+                data.type === "answer"
+            ) {
+
+                if (!peer) return;
+
+                await peer
+                    .setRemoteDescription(
+                        data.sdp
+                    );
+
+            }
+
+
+            else if (
+                data.type === "ice"
+            ) {
+
+                if (!peer) {
+
+                    console.log(
+                        "ICE recebido antes do peer."
+                    );
+
+                    return;
+                }
+
+                await peer.addIceCandidate(
+                    data.candidate
+                );
+
+            }
+
+
+            else if (
+                data.type === "stop"
+            ) {
+
+                video.srcObject = null;
+
+                video.style.display =
+                    "none";
+
+                emptyMessage.style.display =
+                    "block";
+
+                emptyMessage.textContent =
+                    "A transmissão foi encerrada.";
+
+                closePeer();
+
+            }
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Erro WebRTC:",
+                error
+            );
+
+        }
+
+    }
+);
+
+
+/*
+==============================
+CRIAR OFFER
+==============================
+*/
+
+async function startOffer() {
+
+    const p =
+        createPeer();
+
+
+    localStream
+        .getTracks()
+        .forEach(track => {
+
+            p.addTrack(
+                track,
+                localStream
+            );
+
+        });
+
+
+    const offer =
+        await p.createOffer();
+
+
+    await p.setLocalDescription(
+        offer
+    );
+
+
+    socket.emit(
+        "signal",
+        {
+            type: "offer",
+            sdp:
+                p.localDescription
+        }
+    );
+
+
+    status.textContent =
+        "Conectando transmissão...";
+}
+
+
+/*
+==============================
+ESCOLHER TELA
+==============================
+*/
+
+shareButton.onclick =
+async () => {
+
+    try {
+
+        const availableSources =
+            await ipcRenderer.invoke(
+                "get-screen-sources"
+            );
+
+
+        sourcesContainer.innerHTML =
+            "";
+
+
+        for (
+            const source
+            of availableSources
+        ) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+            item.className =
+                "source";
+
+
+            const image =
+                document.createElement(
+                    "img"
+                );
+
+            image.src =
+                source.thumbnail;
+
+
+            const name =
+                document.createElement(
+                    "div"
+                );
+
+            name.className =
+                "source-name";
+
+            name.textContent =
+                source.name;
+
+
+            item.appendChild(image);
+            item.appendChild(name);
+
+
+            item.onclick =
+                () => {
+
+                    sourceModal.style.display =
+                        "none";
+
+                    startSharing(
+                        source.id
+                    );
+
+                };
+
+
+            sourcesContainer.appendChild(
+                item
+            );
+
+        }
+
+
+        sourceModal.style.display =
+            "flex";
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        alert(
+            "Não foi possível listar as telas."
+        );
+
+    }
+
+};
+
+
+cancelSource.onclick =
+    () => {
+
+        sourceModal.style.display =
+            "none";
+    };
+
+
+/*
+==============================
+COMEÇAR TRANSMISSÃO
+==============================
+*/
+
+async function startSharing(
+    sourceId
+) {
+
+    try {
+
+        if (localStream) {
+
+            localStream
+                .getTracks()
+                .forEach(
+                    track =>
+                        track.stop()
+                );
+
+        }
+
+
+        localStream =
+            await navigator.mediaDevices
+                .getUserMedia({
+
+                    audio: false,
+
+                    video: {
+
+                        mandatory: {
+
+                            chromeMediaSource:
+                                "desktop",
+
+                            chromeMediaSourceId:
+                                sourceId,
+
+                            maxWidth: 1920,
+
+                            maxHeight: 1080,
+
+                            maxFrameRate: 60
+
+                        }
+
+                    }
+
+                });
+
+
+        video.srcObject =
+            localStream;
+
+        video.muted = true;
+
+        video.style.display =
+            "block";
+
+        emptyMessage.style.display =
+            "none";
+
+
+        shareButton.style.display =
+            "none";
+
+        stopButton.style.display =
+            "inline-block";
+
+
+        status.textContent =
+            "Transmitindo sua tela...";
+
+
+        /*
+        Se o amigo já estiver conectado,
+        iniciamos o WebRTC agora.
+        */
+
+        if (isHost) {
+
+            await startOffer();
+
+        }
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Erro ao compartilhar:",
+            error
+        );
+
+        alert(
+            "Não foi possível iniciar o compartilhamento."
+        );
+
+    }
+
+}
+
+
+/*
+==============================
+PARAR TRANSMISSÃO
+==============================
+*/
+
+stopButton.onclick =
+    () => {
+
+        if (localStream) {
+
+            localStream
+                .getTracks()
+                .forEach(
+                    track =>
+                        track.stop()
+                );
+
+            localStream = null;
+        }
+
+
+        video.srcObject = null;
+
+        video.style.display =
+            "none";
+
+        emptyMessage.style.display =
+            "block";
+
+        emptyMessage.textContent =
+            "Nenhuma transmissão ativa.";
+
+
+        shareButton.style.display =
+            "inline-block";
+
+        stopButton.style.display =
+            "none";
+
+
+        socket.emit(
+            "signal",
+            {
+                type: "stop"
+            }
+        );
+
+
+        closePeer();
+
+
+        status.textContent =
+            "Transmissão encerrada.";
+    };
+
+
+/*
+==============================
+FECHAR WEBRTC
+==============================
+*/
+
+function closePeer() {
+
+    if (peer) {
+
+        peer.close();
+
+        peer = null;
+    }
+
+}
+
+
+/*
+==============================
+ESTADO INICIAL DO VÍDEO
+==============================
+*/
+
+video.style.display =
+    "none";
+
+</script>
+
+</body>
+</html>
