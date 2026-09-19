@@ -417,7 +417,7 @@ SOCKET
 */
 
 const socket =
-    io("http://localhost:3000");
+    io("https://ksf-screen.onrender.com");
 
 
 let currentRoom = null;
@@ -425,6 +425,10 @@ let isHost = false;
 
 let peer = null;
 let localStream = null;
+
+// Candidatos ICE podem chegar antes de a descrição remota estar pronta.
+// Guardamos esses candidatos e aplicamos assim que o WebRTC puder recebê-los.
+let pendingIceCandidates = [];
 
 
 /*
@@ -741,6 +745,49 @@ socket.on(
 
 /*
 ==============================
+PROCESSAR ICE PENDENTE
+==============================
+*/
+
+async function flushPendingIceCandidates() {
+
+    if (
+        !peer ||
+        !peer.remoteDescription
+    ) {
+        return;
+    }
+
+    const candidates =
+        pendingIceCandidates;
+
+    pendingIceCandidates = [];
+
+    for (const candidate of candidates) {
+
+        try {
+
+            await peer.addIceCandidate(
+                candidate
+            );
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Erro ao adicionar ICE pendente:",
+                error
+            );
+
+        }
+
+    }
+}
+
+
+/*
+==============================
 SINALIZAÇÃO WEBRTC
 ==============================
 */
@@ -761,6 +808,8 @@ socket.on(
                 await p.setRemoteDescription(
                     data.sdp
                 );
+
+                await flushPendingIceCandidates();
 
                 const answer =
                     await p.createAnswer();
@@ -792,6 +841,8 @@ socket.on(
                         data.sdp
                     );
 
+                await flushPendingIceCandidates();
+
             }
 
 
@@ -799,10 +850,17 @@ socket.on(
                 data.type === "ice"
             ) {
 
-                if (!peer) {
+                if (
+                    !peer ||
+                    !peer.remoteDescription
+                ) {
+
+                    pendingIceCandidates.push(
+                        data.candidate
+                    );
 
                     console.log(
-                        "ICE recebido antes do peer."
+                        "ICE aguardando descrição remota."
                     );
 
                     return;
@@ -1179,6 +1237,8 @@ function closePeer() {
 
         peer = null;
     }
+
+    pendingIceCandidates = [];
 
 }
 
