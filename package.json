@@ -1,22 +1,43 @@
 {
   "name": "ksf-screen",
   "version": "1.0.0",
-  "description": "",
+  "description": "KSF Screen - compartilhamento de tela entre amigos",
   "main": "index.js",
   "scripts": {
     "start": "electron .",
-    "server": "node server.js"
+    "server": "node server.js",
+    "build": "electron-builder --win portable"
   },
   "keywords": [],
-  "author": "",
+  "author": "Kaue",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^44.4.3"
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
     "express": "^5.2.1",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3"
+  },
+  "build": {
+    "appId": "com.ksf.screen",
+    "productName": "KSF Screen",
+    "asar": true,
+    "files": [
+      "index.html",
+      "index.js",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "KSF-Screen.exe"
+    }
   }
 }

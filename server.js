@@ -79,7 +79,11 @@ io.on("connection", (socket) => {
                 roomCode,
                 {
                     host: socket.id,
-                    guest: null
+                    guest: null,
+
+                    // ID de quem está transmitindo.
+                    // null = ninguém transmitindo.
+                    broadcaster: null
                 }
             );
 
@@ -185,6 +189,171 @@ io.on("connection", (socket) => {
                 "friend-joined"
             );
 
+
+            /*
+            Informa ao novo usuário
+            se alguém já está transmitindo.
+            */
+
+            if (room.broadcaster) {
+
+                socket.emit(
+                    "broadcast-busy"
+                );
+
+            }
+
+        }
+    );
+
+
+    /*
+    ================================
+    PEDIR PARA TRANSMITIR
+    ================================
+    */
+
+    socket.on(
+        "request-broadcast",
+        () => {
+
+            const roomCode =
+                socket.data.roomCode;
+
+
+            if (!roomCode) {
+                return;
+            }
+
+
+            const room =
+                rooms.get(roomCode);
+
+
+            if (!room) {
+                return;
+            }
+
+
+            /*
+            Se outra pessoa já estiver
+            transmitindo, bloqueia.
+            */
+
+            if (
+                room.broadcaster &&
+                room.broadcaster !== socket.id
+            ) {
+
+                socket.emit(
+                    "broadcast-denied"
+                );
+
+                return;
+            }
+
+
+            /*
+            Reserva a transmissão
+            para este usuário.
+            */
+
+            room.broadcaster =
+                socket.id;
+
+
+            console.log(
+                "Transmissão iniciada:",
+                roomCode,
+                socket.id
+            );
+
+
+            /*
+            Quem pediu recebe autorização.
+            */
+
+            socket.emit(
+                "broadcast-granted"
+            );
+
+
+            /*
+            O outro usuário fica sabendo
+            que a sala está ocupada.
+            */
+
+            socket
+                .to(roomCode)
+                .emit(
+                    "broadcast-started"
+                );
+
+        }
+    );
+
+
+    /*
+    ================================
+    PARAR TRANSMISSÃO
+    ================================
+    */
+
+    socket.on(
+        "stop-broadcast",
+        () => {
+
+            const roomCode =
+                socket.data.roomCode;
+
+
+            if (!roomCode) {
+                return;
+            }
+
+
+            const room =
+                rooms.get(roomCode);
+
+
+            if (!room) {
+                return;
+            }
+
+
+            /*
+            Somente quem está transmitindo
+            pode liberar a transmissão.
+            */
+
+            if (
+                room.broadcaster ===
+                socket.id
+            ) {
+
+                room.broadcaster =
+                    null;
+
+
+                console.log(
+                    "Transmissão encerrada:",
+                    roomCode
+                );
+
+
+                /*
+                Avisa o outro usuário que
+                agora ele pode transmitir.
+                */
+
+                socket
+                    .to(roomCode)
+                    .emit(
+                        "broadcast-stopped"
+                    );
+
+            }
+
         }
     );
 
@@ -247,6 +416,33 @@ io.on("connection", (socket) => {
             }
 
 
+            /*
+            Se quem saiu estava transmitindo,
+            libera a transmissão.
+            */
+
+            if (
+                room.broadcaster ===
+                socket.id
+            ) {
+
+                room.broadcaster =
+                    null;
+
+
+                socket
+                    .to(roomCode)
+                    .emit(
+                        "broadcast-stopped"
+                    );
+
+            }
+
+
+            /*
+            HOST SAIU
+            */
+
             if (
                 socket.data.isHost
             ) {
@@ -269,6 +465,11 @@ io.on("connection", (socket) => {
                 );
 
             }
+
+
+            /*
+            AMIGO SAIU
+            */
 
             else {
 
@@ -317,7 +518,7 @@ server.listen(
         );
 
         console.log(
-            "      KSF SCREEN SERVER"
+            "   KSF SCREEN SERVER V0.3"
         );
 
         console.log(

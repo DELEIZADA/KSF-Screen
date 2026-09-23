@@ -51,6 +51,11 @@ button {
     cursor: pointer;
 }
 
+button:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
 .primary {
     background: #5865f2;
     color: white;
@@ -91,12 +96,13 @@ input {
 }
 
 .topbar {
-    height: 72px;
+    min-height: 72px;
     background: #181b22;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
+    gap: 20px;
 }
 
 .room-info {
@@ -154,6 +160,7 @@ video {
 #emptyMessage {
     color: #777f8c;
     text-align: center;
+    padding: 20px;
 }
 
 #sourceModal {
@@ -178,6 +185,13 @@ video {
 
 .modal h2 {
     margin-top: 0;
+}
+
+.modal-note {
+    color: #9da3ae;
+    margin-top: -5px;
+    margin-bottom: 20px;
+    font-size: 14px;
 }
 
 .sources {
@@ -332,6 +346,10 @@ playsinline>
 O que você quer compartilhar?
 </h2>
 
+<div class="modal-note">
+KSF Screen tentará transmitir também o áudio do computador.
+</div>
+
 <div
 id="sources"
 class="sources">
@@ -426,9 +444,15 @@ let isHost = false;
 let peer = null;
 let localStream = null;
 
-// Candidatos ICE podem chegar antes de a descrição remota estar pronta.
-// Guardamos esses candidatos e aplicamos assim que o WebRTC puder recebê-los.
 let pendingIceCandidates = [];
+
+let selectedSourceId = null;
+
+let broadcastBusy = false;
+
+let waitingBroadcastPermission = false;
+
+let isBroadcasting = false;
 
 
 /*
@@ -499,6 +523,58 @@ function showRoom(code) {
     home.style.display = "none";
 
     room.style.display = "flex";
+
+    updateShareButton();
+}
+
+
+/*
+==============================
+BOTÃO DE COMPARTILHAR
+==============================
+*/
+
+function updateShareButton() {
+
+    if (isBroadcasting) {
+
+        shareButton.style.display =
+            "none";
+
+        stopButton.style.display =
+            "inline-block";
+
+        return;
+    }
+
+
+    stopButton.style.display =
+        "none";
+
+    shareButton.style.display =
+        "inline-block";
+
+
+    if (broadcastBusy) {
+
+        shareButton.disabled =
+            true;
+
+        shareButton.textContent =
+            "Amigo transmitindo";
+
+    }
+
+    else {
+
+        shareButton.disabled =
+            false;
+
+        shareButton.textContent =
+            "🖥 Compartilhar Tela";
+
+    }
+
 }
 
 
@@ -606,7 +682,13 @@ socket.on(
         status.textContent =
             "Amigo desconectado.";
 
+        broadcastBusy = false;
+
+        stopLocalTransmission(false);
+
         closePeer();
+
+        updateShareButton();
     }
 );
 
@@ -618,7 +700,13 @@ socket.on(
         status.textContent =
             "O dono saiu da sala.";
 
+        broadcastBusy = false;
+
+        stopLocalTransmission(false);
+
         closePeer();
+
+        updateShareButton();
     }
 );
 
@@ -637,6 +725,146 @@ socket.on(
 
 /*
 ==============================
+CONTROLE DE TRANSMISSÃO
+==============================
+*/
+
+socket.on(
+    "broadcast-granted",
+    async () => {
+
+        if (
+            !waitingBroadcastPermission ||
+            !selectedSourceId
+        ) {
+            return;
+        }
+
+        waitingBroadcastPermission =
+            false;
+
+        broadcastBusy =
+            false;
+
+        try {
+
+            await startSharing(
+                selectedSourceId
+            );
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Erro ao iniciar transmissão:",
+                error
+            );
+
+            socket.emit(
+                "stop-broadcast"
+            );
+
+            selectedSourceId =
+                null;
+
+            broadcastBusy =
+                false;
+
+            updateShareButton();
+
+            alert(
+                "Não foi possível iniciar a transmissão."
+            );
+
+        }
+
+    }
+);
+
+
+socket.on(
+    "broadcast-denied",
+    () => {
+
+        waitingBroadcastPermission =
+            false;
+
+        selectedSourceId =
+            null;
+
+        broadcastBusy =
+            true;
+
+        status.textContent =
+            "Seu amigo já está transmitindo.";
+
+        updateShareButton();
+    }
+);
+
+
+socket.on(
+    "broadcast-started",
+    () => {
+
+        broadcastBusy =
+            true;
+
+        status.textContent =
+            "Seu amigo está iniciando a transmissão...";
+
+        updateShareButton();
+    }
+);
+
+
+socket.on(
+    "broadcast-busy",
+    () => {
+
+        broadcastBusy =
+            true;
+
+        status.textContent =
+            "Seu amigo está transmitindo.";
+
+        updateShareButton();
+    }
+);
+
+
+socket.on(
+    "broadcast-stopped",
+    () => {
+
+        broadcastBusy =
+            false;
+
+        video.srcObject =
+            null;
+
+        video.style.display =
+            "none";
+
+        emptyMessage.style.display =
+            "block";
+
+        emptyMessage.textContent =
+            "Nenhuma transmissão ativa.";
+
+        closePeer();
+
+        status.textContent =
+            "Transmissão encerrada. Você pode compartilhar agora.";
+
+        updateShareButton();
+    }
+);
+
+
+/*
+==============================
 CRIAR WEBRTC PEER
 ==============================
 */
@@ -644,8 +872,14 @@ CRIAR WEBRTC PEER
 function createPeer() {
 
     if (peer) {
+
         peer.close();
+
+        peer = null;
     }
+
+    pendingIceCandidates =
+        [];
 
     peer =
         new RTCPeerConnection(
@@ -662,6 +896,7 @@ function createPeer() {
                     "signal",
                     {
                         type: "ice",
+
                         candidate:
                             event.candidate
                     }
@@ -675,20 +910,49 @@ function createPeer() {
     peer.onconnectionstatechange =
         () => {
 
-            if (!peer) return;
+            if (!peer) {
+                return;
+            }
 
             console.log(
                 "WebRTC:",
                 peer.connectionState
             );
 
+
             if (
                 peer.connectionState ===
                 "connected"
             ) {
 
-                status.textContent =
-                    "Transmissão conectada!";
+                if (isBroadcasting) {
+
+                    status.textContent =
+                        "Transmitindo sua tela!";
+
+                }
+
+                else {
+
+                    status.textContent =
+                        "Assistindo transmissão!";
+
+                }
+
+            }
+
+
+            else if (
+                peer.connectionState ===
+                    "failed" ||
+                peer.connectionState ===
+                    "disconnected"
+            ) {
+
+                console.log(
+                    "Conexão WebRTC interrompida."
+                );
+
             }
 
         };
@@ -700,10 +964,20 @@ function createPeer() {
             const remoteStream =
                 event.streams[0];
 
+
             video.srcObject =
                 remoteStream;
 
-            video.muted = false;
+            /*
+            Quem recebe a transmissão
+            precisa ouvir o áudio.
+            */
+
+            video.muted =
+                false;
+
+            video.volume =
+                1;
 
             video.style.display =
                 "block";
@@ -713,34 +987,29 @@ function createPeer() {
 
             status.textContent =
                 "Assistindo transmissão!";
+
+
+            /*
+            Electron normalmente permite
+            autoplay, mas chamamos play()
+            para garantir.
+            */
+
+            video.play()
+                .catch(error => {
+
+                    console.log(
+                        "Autoplay aguardando:",
+                        error
+                    );
+
+                });
+
         };
 
 
     return peer;
 }
-
-
-/*
-==============================
-AMIGO PRONTO PARA RECEBER
-==============================
-*/
-
-socket.on(
-    "friend-joined",
-    async () => {
-
-        if (
-            isHost &&
-            localStream
-        ) {
-
-            await startOffer();
-
-        }
-
-    }
-);
 
 
 /*
@@ -755,15 +1024,22 @@ async function flushPendingIceCandidates() {
         !peer ||
         !peer.remoteDescription
     ) {
+
         return;
     }
+
 
     const candidates =
         pendingIceCandidates;
 
-    pendingIceCandidates = [];
+    pendingIceCandidates =
+        [];
 
-    for (const candidate of candidates) {
+
+    for (
+        const candidate
+        of candidates
+    ) {
 
         try {
 
@@ -783,6 +1059,7 @@ async function flushPendingIceCandidates() {
         }
 
     }
+
 }
 
 
@@ -802,26 +1079,47 @@ socket.on(
                 data.type === "offer"
             ) {
 
+                /*
+                O outro usuário é quem
+                está transmitindo.
+                */
+
+                isBroadcasting =
+                    false;
+
+                broadcastBusy =
+                    true;
+
+                updateShareButton();
+
+
                 const p =
                     createPeer();
+
 
                 await p.setRemoteDescription(
                     data.sdp
                 );
 
+
                 await flushPendingIceCandidates();
+
 
                 const answer =
                     await p.createAnswer();
+
 
                 await p.setLocalDescription(
                     answer
                 );
 
+
                 socket.emit(
                     "signal",
                     {
-                        type: "answer",
+                        type:
+                            "answer",
+
                         sdp:
                             p.localDescription
                     }
@@ -834,12 +1132,16 @@ socket.on(
                 data.type === "answer"
             ) {
 
-                if (!peer) return;
+                if (!peer) {
+                    return;
+                }
+
 
                 await peer
                     .setRemoteDescription(
                         data.sdp
                     );
+
 
                 await flushPendingIceCandidates();
 
@@ -866,6 +1168,7 @@ socket.on(
                     return;
                 }
 
+
                 await peer.addIceCandidate(
                     data.candidate
                 );
@@ -877,7 +1180,8 @@ socket.on(
                 data.type === "stop"
             ) {
 
-                video.srcObject = null;
+                video.srcObject =
+                    null;
 
                 video.style.display =
                     "none";
@@ -886,7 +1190,7 @@ socket.on(
                     "block";
 
                 emptyMessage.textContent =
-                    "A transmissão foi encerrada.";
+                    "Nenhuma transmissão ativa.";
 
                 closePeer();
 
@@ -915,20 +1219,27 @@ CRIAR OFFER
 
 async function startOffer() {
 
+    if (!localStream) {
+        return;
+    }
+
+
     const p =
         createPeer();
 
 
     localStream
         .getTracks()
-        .forEach(track => {
+        .forEach(
+            track => {
 
-            p.addTrack(
-                track,
-                localStream
-            );
+                p.addTrack(
+                    track,
+                    localStream
+                );
 
-        });
+            }
+        );
 
 
     const offer =
@@ -943,7 +1254,9 @@ async function startOffer() {
     socket.emit(
         "signal",
         {
-            type: "offer",
+            type:
+                "offer",
+
             sdp:
                 p.localDescription
         }
@@ -952,6 +1265,7 @@ async function startOffer() {
 
     status.textContent =
         "Conectando transmissão...";
+
 }
 
 
@@ -963,6 +1277,16 @@ ESCOLHER TELA
 
 shareButton.onclick =
 async () => {
+
+    if (broadcastBusy) {
+
+        alert(
+            "Seu amigo já está transmitindo."
+        );
+
+        return;
+    }
+
 
     try {
 
@@ -986,6 +1310,7 @@ async () => {
                     "div"
                 );
 
+
             item.className =
                 "source";
 
@@ -994,6 +1319,7 @@ async () => {
                 document.createElement(
                     "img"
                 );
+
 
             image.src =
                 source.thumbnail;
@@ -1004,15 +1330,22 @@ async () => {
                     "div"
                 );
 
+
             name.className =
                 "source-name";
+
 
             name.textContent =
                 source.name;
 
 
-            item.appendChild(image);
-            item.appendChild(name);
+            item.appendChild(
+                image
+            );
+
+            item.appendChild(
+                name
+            );
 
 
             item.onclick =
@@ -1021,8 +1354,27 @@ async () => {
                     sourceModal.style.display =
                         "none";
 
-                    startSharing(
-                        source.id
+
+                    /*
+                    Primeiro reservamos
+                    a transmissão no servidor.
+                    */
+
+                    selectedSourceId =
+                        source.id;
+
+                    waitingBroadcastPermission =
+                        true;
+
+                    status.textContent =
+                        "Preparando transmissão...";
+
+                    shareButton.disabled =
+                        true;
+
+
+                    socket.emit(
+                        "request-broadcast"
                     );
 
                 };
@@ -1042,7 +1394,10 @@ async () => {
 
     catch (error) {
 
-        console.error(error);
+        console.error(
+            error
+        );
+
 
         alert(
             "Não foi possível listar as telas."
@@ -1063,33 +1418,46 @@ cancelSource.onclick =
 
 /*
 ==============================
-COMEÇAR TRANSMISSÃO
+CAPTURAR TELA
 ==============================
 */
 
-async function startSharing(
+async function captureScreen(
     sourceId
 ) {
 
+    /*
+    Primeiro tentamos capturar
+    VÍDEO + ÁUDIO DO SISTEMA.
+
+    Algumas fontes/versões do Windows
+    podem não disponibilizar áudio
+    dessa maneira.
+
+    Se falhar, fazemos automaticamente
+    uma segunda tentativa somente
+    com o vídeo.
+    */
+
     try {
 
-        if (localStream) {
-
-            localStream
-                .getTracks()
-                .forEach(
-                    track =>
-                        track.stop()
-                );
-
-        }
-
-
-        localStream =
+        const stream =
             await navigator.mediaDevices
                 .getUserMedia({
 
-                    audio: false,
+                    audio: {
+
+                        mandatory: {
+
+                            chromeMediaSource:
+                                "desktop",
+
+                            chromeMediaSourceId:
+                                sourceId
+
+                        }
+
+                    },
 
                     video: {
 
@@ -1101,11 +1469,14 @@ async function startSharing(
                             chromeMediaSourceId:
                                 sourceId,
 
-                            maxWidth: 1920,
+                            maxWidth:
+                                1920,
 
-                            maxHeight: 1080,
+                            maxHeight:
+                                1080,
 
-                            maxFrameRate: 60
+                            maxFrameRate:
+                                60
 
                         }
 
@@ -1114,52 +1485,191 @@ async function startSharing(
                 });
 
 
-        video.srcObject =
-            localStream;
-
-        video.muted = true;
-
-        video.style.display =
-            "block";
-
-        emptyMessage.style.display =
-            "none";
+        console.log(
+            "Captura iniciada com áudio.",
+            stream.getAudioTracks().length,
+            "faixa(s) de áudio."
+        );
 
 
-        shareButton.style.display =
-            "none";
-
-        stopButton.style.display =
-            "inline-block";
-
-
-        status.textContent =
-            "Transmitindo sua tela...";
-
-
-        /*
-        Se o amigo já estiver conectado,
-        iniciamos o WebRTC agora.
-        */
-
-        if (isHost) {
-
-            await startOffer();
-
-        }
+        return stream;
 
     }
 
-    catch (error) {
+    catch (audioError) {
 
-        console.error(
-            "Erro ao compartilhar:",
-            error
+        console.warn(
+            "Áudio do sistema indisponível. Tentando somente vídeo.",
+            audioError
         );
 
-        alert(
-            "Não foi possível iniciar o compartilhamento."
+
+        const stream =
+            await navigator.mediaDevices
+                .getUserMedia({
+
+                    audio:
+                        false,
+
+                    video: {
+
+                        mandatory: {
+
+                            chromeMediaSource:
+                                "desktop",
+
+                            chromeMediaSourceId:
+                                sourceId,
+
+                            maxWidth:
+                                1920,
+
+                            maxHeight:
+                                1080,
+
+                            maxFrameRate:
+                                60
+
+                        }
+
+                    }
+
+                });
+
+
+        console.log(
+            "Captura iniciada sem áudio."
         );
+
+
+        return stream;
+
+    }
+
+}
+
+
+/*
+==============================
+COMEÇAR TRANSMISSÃO
+==============================
+*/
+
+async function startSharing(
+    sourceId
+) {
+
+    if (localStream) {
+
+        localStream
+            .getTracks()
+            .forEach(
+                track =>
+                    track.stop()
+            );
+
+        localStream =
+            null;
+    }
+
+
+    localStream =
+        await captureScreen(
+            sourceId
+        );
+
+
+    selectedSourceId =
+        null;
+
+
+    isBroadcasting =
+        true;
+
+    broadcastBusy =
+        false;
+
+
+    /*
+    Mostramos a própria tela localmente.
+    O áudio fica MUDO localmente para
+    evitar eco/realimentação.
+    */
+
+    video.srcObject =
+        localStream;
+
+    video.muted =
+        true;
+
+    video.style.display =
+        "block";
+
+    emptyMessage.style.display =
+        "none";
+
+
+    updateShareButton();
+
+
+    const audioTracks =
+        localStream
+            .getAudioTracks();
+
+
+    if (
+        audioTracks.length > 0
+    ) {
+
+        status.textContent =
+            "Transmitindo tela + áudio...";
+
+    }
+
+    else {
+
+        status.textContent =
+            "Transmitindo tela (áudio indisponível nesta fonte)...";
+
+    }
+
+
+    /*
+    AGORA QUALQUER UM PODE SER
+    O TRANSMISSOR.
+
+    Não existe mais:
+    if (isHost)
+    */
+
+    await startOffer();
+
+
+    /*
+    Se a captura for encerrada pelo
+    Windows/navegador, encerramos também
+    a transmissão da sala.
+    */
+
+    const videoTrack =
+        localStream
+            .getVideoTracks()[0];
+
+
+    if (videoTrack) {
+
+        videoTrack.onended =
+            () => {
+
+                if (
+                    isBroadcasting
+                ) {
+
+                    stopTransmission();
+
+                }
+
+            };
 
     }
 
@@ -1172,54 +1682,110 @@ PARAR TRANSMISSÃO
 ==============================
 */
 
-stopButton.onclick =
-    () => {
+function stopLocalTransmission(
+    resetStatus = true
+) {
 
-        if (localStream) {
+    if (localStream) {
 
-            localStream
-                .getTracks()
-                .forEach(
-                    track =>
-                        track.stop()
-                );
+        localStream
+            .getTracks()
+            .forEach(
+                track =>
+                    track.stop()
+            );
 
-            localStream = null;
-        }
-
-
-        video.srcObject = null;
-
-        video.style.display =
-            "none";
-
-        emptyMessage.style.display =
-            "block";
-
-        emptyMessage.textContent =
-            "Nenhuma transmissão ativa.";
+        localStream =
+            null;
+    }
 
 
-        shareButton.style.display =
-            "inline-block";
+    isBroadcasting =
+        false;
 
-        stopButton.style.display =
-            "none";
+    waitingBroadcastPermission =
+        false;
 
-
-        socket.emit(
-            "signal",
-            {
-                type: "stop"
-            }
-        );
+    selectedSourceId =
+        null;
 
 
-        closePeer();
+    video.srcObject =
+        null;
 
+    video.style.display =
+        "none";
+
+
+    emptyMessage.style.display =
+        "block";
+
+    emptyMessage.textContent =
+        "Nenhuma transmissão ativa.";
+
+
+    closePeer();
+
+
+    if (resetStatus) {
 
         status.textContent =
             "Transmissão encerrada.";
+
+    }
+
+
+    updateShareButton();
+
+}
+
+
+function stopTransmission() {
+
+    if (!isBroadcasting) {
+        return;
+    }
+
+
+    /*
+    Avisamos o receptor para
+    remover a imagem imediatamente.
+    */
+
+    socket.emit(
+        "signal",
+        {
+            type:
+                "stop"
+        }
+    );
+
+
+    /*
+    Liberamos a vez no servidor.
+    */
+
+    socket.emit(
+        "stop-broadcast"
+    );
+
+
+    broadcastBusy =
+        false;
+
+
+    stopLocalTransmission(
+        true
+    );
+
+}
+
+
+stopButton.onclick =
+    () => {
+
+        stopTransmission();
+
     };
 
 
@@ -1233,24 +1799,53 @@ function closePeer() {
 
     if (peer) {
 
-        peer.close();
+        try {
 
-        peer = null;
+            peer.onicecandidate =
+                null;
+
+            peer.ontrack =
+                null;
+
+            peer.onconnectionstatechange =
+                null;
+
+            peer.close();
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Erro ao fechar WebRTC:",
+                error
+            );
+
+        }
+
+
+        peer =
+            null;
+
     }
 
-    pendingIceCandidates = [];
+
+    pendingIceCandidates =
+        [];
 
 }
 
 
 /*
 ==============================
-ESTADO INICIAL DO VÍDEO
+ESTADO INICIAL
 ==============================
 */
 
 video.style.display =
     "none";
+
+updateShareButton();
 
 </script>
 
