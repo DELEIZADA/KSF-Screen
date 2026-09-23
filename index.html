@@ -132,6 +132,118 @@ input {
     display: none;
 }
 
+#streamQualityBadge {
+    display: none;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: #101217;
+    border: 1px solid #353b48;
+    color: #cfd3dc;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+#streamQualityBadge.active {
+    display: inline-flex;
+}
+
+.quality-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #23d18b;
+}
+
+
+#audioBadge {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: #101217;
+    border: 1px solid #353b48;
+    color: #cfd3dc;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+#audioBadge.active {
+    display: inline-flex;
+}
+
+#updatePanel {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    width: 310px;
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(24, 27, 34, .97);
+    border: 1px solid #353b48;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, .35);
+    z-index: 300;
+}
+
+.update-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.update-title {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#appVersion {
+    color: #8f96a3;
+    font-size: 12px;
+}
+
+#updateMessage {
+    color: #aab0bb;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+#updateProgressWrap {
+    display: none;
+    height: 7px;
+    margin-top: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #101217;
+}
+
+#updateProgress {
+    width: 0%;
+    height: 100%;
+    background: #5865f2;
+    transition: width .2s ease;
+}
+
+.update-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.update-buttons button {
+    flex: 1;
+    padding: 9px 10px;
+    font-size: 13px;
+}
+
+#downloadUpdateButton,
+#installUpdateButton {
+    display: none;
+}
+
 .video-area {
     flex: 1;
     padding: 22px;
@@ -176,7 +288,7 @@ video {
 .modal {
     width: 850px;
     max-width: 90vw;
-    max-height: 80vh;
+    max-height: 85vh;
     overflow: auto;
     background: #181b22;
     border-radius: 16px;
@@ -185,13 +297,47 @@ video {
 
 .modal h2 {
     margin-top: 0;
+    margin-bottom: 8px;
 }
 
 .modal-note {
     color: #9da3ae;
-    margin-top: -5px;
     margin-bottom: 20px;
     font-size: 14px;
+}
+
+.quality-panel {
+    background: #101217;
+    border: 1px solid #303542;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 22px;
+}
+
+.quality-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.quality-select {
+    width: 100%;
+    background: #242832;
+    border: 1px solid #3b4250;
+    border-radius: 8px;
+    padding: 12px;
+    color: white;
+    font-size: 15px;
+    outline: none;
+    cursor: pointer;
+}
+
+.quality-description {
+    margin-top: 9px;
+    color: #8f96a3;
+    font-size: 13px;
 }
 
 .sources {
@@ -237,8 +383,6 @@ video {
 
 <body>
 
-<!-- HOME -->
-
 <div id="home">
 
 <div class="card">
@@ -267,11 +411,8 @@ Entrar na Sala
 </button>
 
 </div>
-
 </div>
 
-
-<!-- SALA -->
 
 <div id="room">
 
@@ -281,9 +422,7 @@ Entrar na Sala
 
 <strong>KSF Screen</strong>
 
-<span>
-Sala:
-</span>
+<span>Sala:</span>
 
 <span id="roomCode">
 ------
@@ -293,8 +432,16 @@ Sala:
 Conectando...
 </span>
 
-</div>
+<span id="streamQualityBadge">
+<span class="quality-dot"></span>
+<span id="streamQualityText">Qualidade</span>
+</span>
 
+<span id="audioBadge">
+🔊 <span id="audioBadgeText">Áudio do PC</span>
+</span>
+
+</div>
 
 <div class="actions">
 
@@ -311,7 +458,6 @@ Parar transmissão
 </button>
 
 </div>
-
 </div>
 
 
@@ -330,13 +476,10 @@ playsinline>
 </video>
 
 </div>
-
 </div>
 
 </div>
 
-
-<!-- SELETOR DE TELA -->
 
 <div id="sourceModal">
 
@@ -347,8 +490,50 @@ O que você quer compartilhar?
 </h2>
 
 <div class="modal-note">
-KSF Screen tentará transmitir também o áudio do computador.
+Escolha a qualidade e depois a tela ou janela.
 </div>
+
+
+<div class="quality-panel">
+
+<div class="quality-header">
+⚙ Qualidade da transmissão
+</div>
+
+<select
+id="qualitySelect"
+class="quality-select">
+
+<option value="auto">
+Automático (recomendado)
+</option>
+
+<option value="720p30">
+720p • 30 FPS
+</option>
+
+<option value="720p60">
+720p • 60 FPS
+</option>
+
+<option value="1080p30">
+1080p • 30 FPS
+</option>
+
+<option value="1080p60">
+1080p • 60 FPS
+</option>
+
+</select>
+
+<div
+id="qualityDescription"
+class="quality-description">
+Equilibra qualidade e desempenho automaticamente.
+</div>
+
+</div>
+
 
 <div
 id="sources"
@@ -364,6 +549,45 @@ Cancelar
 </button>
 
 </div>
+
+</div>
+</div>
+
+
+<div id="updatePanel">
+
+<div class="update-top">
+<div class="update-title">Atualizações</div>
+<div id="appVersion">v...</div>
+</div>
+
+<div id="updateMessage">
+Verificando versão do KSF Screen...
+</div>
+
+<div id="updateProgressWrap">
+<div id="updateProgress"></div>
+</div>
+
+<div class="update-buttons">
+
+<button
+id="checkUpdateButton"
+class="secondary">
+Verificar
+</button>
+
+<button
+id="downloadUpdateButton"
+class="primary">
+Baixar
+</button>
+
+<button
+id="installUpdateButton"
+class="primary">
+Atualizar e reiniciar
+</button>
 
 </div>
 
@@ -406,6 +630,12 @@ const roomCode =
 const status =
     document.getElementById("status");
 
+const streamQualityBadge =
+    document.getElementById("streamQualityBadge");
+
+const streamQualityText =
+    document.getElementById("streamQualityText");
+
 const shareButton =
     document.getElementById("shareButton");
 
@@ -426,6 +656,45 @@ const sourcesContainer =
 
 const cancelSource =
     document.getElementById("cancelSource");
+
+const qualitySelect =
+    document.getElementById("qualitySelect");
+
+const qualityDescription =
+    document.getElementById(
+        "qualityDescription"
+    );
+
+
+const audioBadge =
+    document.getElementById("audioBadge");
+
+const audioBadgeText =
+    document.getElementById("audioBadgeText");
+
+const updatePanel =
+    document.getElementById("updatePanel");
+
+const appVersion =
+    document.getElementById("appVersion");
+
+const updateMessage =
+    document.getElementById("updateMessage");
+
+const updateProgressWrap =
+    document.getElementById("updateProgressWrap");
+
+const updateProgress =
+    document.getElementById("updateProgress");
+
+const checkUpdateButton =
+    document.getElementById("checkUpdateButton");
+
+const downloadUpdateButton =
+    document.getElementById("downloadUpdateButton");
+
+const installUpdateButton =
+    document.getElementById("installUpdateButton");
 
 
 /*
@@ -453,6 +722,191 @@ let broadcastBusy = false;
 let waitingBroadcastPermission = false;
 
 let isBroadcasting = false;
+
+let activeQualityProfile = null;
+let activeCaptureSettings = null;
+let systemAudioActive = false;
+
+
+/*
+==============================
+QUALIDADES
+==============================
+*/
+
+const qualityProfiles = {
+
+    auto: {
+        label: "Automático",
+        width: 1920,
+        height: 1080,
+        fps: 60,
+        bitrate: 6000000,
+        description:
+            "Equilibra qualidade e desempenho automaticamente."
+    },
+
+    "720p30": {
+        label: "720p 30 FPS",
+        width: 1280,
+        height: 720,
+        fps: 30,
+        bitrate: 2500000,
+        description:
+            "Mais leve. Ideal para economizar processamento e internet."
+    },
+
+    "720p60": {
+        label: "720p 60 FPS",
+        width: 1280,
+        height: 720,
+        fps: 60,
+        bitrate: 4000000,
+        description:
+            "Imagem fluida com consumo moderado."
+    },
+
+    "1080p30": {
+        label: "1080p 30 FPS",
+        width: 1920,
+        height: 1080,
+        fps: 30,
+        bitrate: 4500000,
+        description:
+            "Imagem nítida com menos carga que 1080p 60 FPS."
+    },
+
+    "1080p60": {
+        label: "1080p 60 FPS",
+        width: 1920,
+        height: 1080,
+        fps: 60,
+        bitrate: 8000000,
+        description:
+            "Qualidade máxima. Usa mais internet e processamento."
+    }
+
+};
+
+
+function getQualityProfile() {
+
+    return qualityProfiles[
+        qualitySelect.value
+    ] || qualityProfiles.auto;
+
+}
+
+
+qualitySelect.onchange =
+    () => {
+
+        const profile =
+            getQualityProfile();
+
+        qualityDescription.textContent =
+            profile.description;
+
+    };
+
+
+function formatCaptureNumber(value) {
+
+    if (value === undefined || value === null) {
+        return "?";
+    }
+
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return "?";
+    }
+
+    return Number.isInteger(number)
+        ? String(number)
+        : number.toFixed(1);
+}
+
+
+function updateQualityBadge() {
+
+    if (
+        !isBroadcasting ||
+        !activeQualityProfile
+    ) {
+
+        streamQualityBadge.classList.remove(
+            "active"
+        );
+
+        return;
+    }
+
+
+    let text =
+        activeQualityProfile.label;
+
+
+    if (activeCaptureSettings) {
+
+        const width =
+            formatCaptureNumber(
+                activeCaptureSettings.width
+            );
+
+        const height =
+            formatCaptureNumber(
+                activeCaptureSettings.height
+            );
+
+        const fps =
+            formatCaptureNumber(
+                activeCaptureSettings.frameRate
+            );
+
+
+        text +=
+            " • Captura " +
+            width +
+            "×" +
+            height +
+            " • " +
+            fps +
+            " FPS";
+    }
+
+
+    streamQualityText.textContent =
+        text;
+
+    streamQualityBadge.classList.add(
+        "active"
+    );
+}
+
+
+function updateAudioBadge() {
+
+    if (
+        isBroadcasting &&
+        systemAudioActive
+    ) {
+
+        audioBadgeText.textContent =
+            "Áudio do PC";
+
+        audioBadge.classList.add(
+            "active"
+        );
+
+        return;
+    }
+
+
+    audioBadge.classList.remove(
+        "active"
+    );
+}
 
 
 /*
@@ -524,13 +978,17 @@ function showRoom(code) {
 
     room.style.display = "flex";
 
+    // O painel de atualização fica somente na tela inicial.
+    // Assim ele não cobre a transmissão nem os controles da sala.
+    updatePanel.style.display = "none";
+
     updateShareButton();
 }
 
 
 /*
 ==============================
-BOTÃO DE COMPARTILHAR
+BOTÃO COMPARTILHAR
 ==============================
 */
 
@@ -605,7 +1063,7 @@ createButton.onclick = () => {
 
 /*
 ==============================
-ENTRAR
+ENTRAR NA SALA
 ==============================
 */
 
@@ -641,7 +1099,7 @@ joinButton.onclick = () => {
 
 /*
 ==============================
-SOCKET - SALA
+EVENTOS DA SALA
 ==============================
 */
 
@@ -651,6 +1109,7 @@ socket.on(
 
         status.textContent =
             "Aguardando amigo...";
+
     }
 );
 
@@ -661,16 +1120,47 @@ socket.on(
 
         status.textContent =
             "Conectado!";
+
     }
 );
 
 
 socket.on(
     "friend-joined",
-    () => {
+    async () => {
 
         status.textContent =
             "Amigo conectado!";
+
+
+        /*
+        Se a transmissão começou antes do amigo
+        entrar, cria uma nova oferta WebRTC agora
+        que existe alguém para recebê-la.
+        */
+
+        if (
+            isBroadcasting &&
+            localStream
+        ) {
+
+            try {
+
+                await startOffer();
+
+            }
+
+            catch (error) {
+
+                console.error(
+                    "Erro ao reconectar transmissão:",
+                    error
+                );
+
+            }
+
+        }
+
     }
 );
 
@@ -682,13 +1172,27 @@ socket.on(
         status.textContent =
             "Amigo desconectado.";
 
-        broadcastBusy = false;
+        broadcastBusy =
+            false;
 
-        stopLocalTransmission(false);
+
+        if (isBroadcasting) {
+
+            socket.emit(
+                "stop-broadcast"
+            );
+
+        }
+
+
+        stopLocalTransmission(
+            false
+        );
 
         closePeer();
 
         updateShareButton();
+
     }
 );
 
@@ -700,13 +1204,17 @@ socket.on(
         status.textContent =
             "O dono saiu da sala.";
 
-        broadcastBusy = false;
+        broadcastBusy =
+            false;
 
-        stopLocalTransmission(false);
+        stopLocalTransmission(
+            false
+        );
 
         closePeer();
 
         updateShareButton();
+
     }
 );
 
@@ -717,8 +1225,12 @@ socket.on(
 
         alert(message);
 
-        room.style.display = "none";
-        home.style.display = "flex";
+        room.style.display =
+            "none";
+
+        home.style.display =
+            "flex";
+
     }
 );
 
@@ -740,11 +1252,13 @@ socket.on(
             return;
         }
 
+
         waitingBroadcastPermission =
             false;
 
         broadcastBusy =
             false;
+
 
         try {
 
@@ -761,9 +1275,11 @@ socket.on(
                 error
             );
 
+
             socket.emit(
                 "stop-broadcast"
             );
+
 
             selectedSourceId =
                 null;
@@ -771,7 +1287,9 @@ socket.on(
             broadcastBusy =
                 false;
 
+
             updateShareButton();
+
 
             alert(
                 "Não foi possível iniciar a transmissão."
@@ -800,6 +1318,7 @@ socket.on(
             "Seu amigo já está transmitindo.";
 
         updateShareButton();
+
     }
 );
 
@@ -815,6 +1334,7 @@ socket.on(
             "Seu amigo está iniciando a transmissão...";
 
         updateShareButton();
+
     }
 );
 
@@ -830,6 +1350,7 @@ socket.on(
             "Seu amigo está transmitindo.";
 
         updateShareButton();
+
     }
 );
 
@@ -859,6 +1380,7 @@ socket.on(
             "Transmissão encerrada. Você pode compartilhar agora.";
 
         updateShareButton();
+
     }
 );
 
@@ -876,10 +1398,9 @@ function createPeer() {
         peer.close();
 
         peer = null;
+
     }
 
-    pendingIceCandidates =
-        [];
 
     peer =
         new RTCPeerConnection(
@@ -895,7 +1416,8 @@ function createPeer() {
                 socket.emit(
                     "signal",
                     {
-                        type: "ice",
+                        type:
+                            "ice",
 
                         candidate:
                             event.candidate
@@ -913,6 +1435,7 @@ function createPeer() {
             if (!peer) {
                 return;
             }
+
 
             console.log(
                 "WebRTC:",
@@ -941,20 +1464,6 @@ function createPeer() {
 
             }
 
-
-            else if (
-                peer.connectionState ===
-                    "failed" ||
-                peer.connectionState ===
-                    "disconnected"
-            ) {
-
-                console.log(
-                    "Conexão WebRTC interrompida."
-                );
-
-            }
-
         };
 
 
@@ -967,11 +1476,6 @@ function createPeer() {
 
             video.srcObject =
                 remoteStream;
-
-            /*
-            Quem recebe a transmissão
-            precisa ouvir o áudio.
-            */
 
             video.muted =
                 false;
@@ -989,21 +1493,17 @@ function createPeer() {
                 "Assistindo transmissão!";
 
 
-            /*
-            Electron normalmente permite
-            autoplay, mas chamamos play()
-            para garantir.
-            */
-
             video.play()
-                .catch(error => {
+                .catch(
+                    error => {
 
-                    console.log(
-                        "Autoplay aguardando:",
-                        error
-                    );
+                        console.log(
+                            "Autoplay aguardando:",
+                            error
+                        );
 
-                });
+                    }
+                );
 
         };
 
@@ -1014,7 +1514,7 @@ function createPeer() {
 
 /*
 ==============================
-PROCESSAR ICE PENDENTE
+ICE PENDENTE
 ==============================
 */
 
@@ -1024,13 +1524,13 @@ async function flushPendingIceCandidates() {
         !peer ||
         !peer.remoteDescription
     ) {
-
         return;
     }
 
 
     const candidates =
         pendingIceCandidates;
+
 
     pendingIceCandidates =
         [];
@@ -1052,7 +1552,7 @@ async function flushPendingIceCandidates() {
         catch (error) {
 
             console.error(
-                "Erro ao adicionar ICE pendente:",
+                "Erro ao adicionar ICE:",
                 error
             );
 
@@ -1076,13 +1576,9 @@ socket.on(
         try {
 
             if (
-                data.type === "offer"
+                data.type ===
+                "offer"
             ) {
-
-                /*
-                O outro usuário é quem
-                está transmitindo.
-                */
 
                 isBroadcasting =
                     false;
@@ -1129,7 +1625,8 @@ socket.on(
 
 
             else if (
-                data.type === "answer"
+                data.type ===
+                "answer"
             ) {
 
                 if (!peer) {
@@ -1149,7 +1646,8 @@ socket.on(
 
 
             else if (
-                data.type === "ice"
+                data.type ===
+                "ice"
             ) {
 
                 if (
@@ -1161,11 +1659,8 @@ socket.on(
                         data.candidate
                     );
 
-                    console.log(
-                        "ICE aguardando descrição remota."
-                    );
-
                     return;
+
                 }
 
 
@@ -1177,7 +1672,8 @@ socket.on(
 
 
             else if (
-                data.type === "stop"
+                data.type ===
+                "stop"
             ) {
 
                 video.srcObject =
@@ -1213,6 +1709,88 @@ socket.on(
 
 /*
 ==============================
+CONFIGURAR QUALIDADE DE ENVIO
+==============================
+*/
+
+async function configureVideoSender(
+    sender
+) {
+
+    if (
+        !sender ||
+        !sender.track ||
+        sender.track.kind !== "video"
+    ) {
+        return;
+    }
+
+
+    const profile =
+        activeQualityProfile ||
+        getQualityProfile();
+
+
+    try {
+
+        const parameters =
+            sender.getParameters();
+
+
+        if (
+            !parameters.encodings ||
+            parameters.encodings.length === 0
+        ) {
+
+            parameters.encodings =
+                [{}];
+
+        }
+
+
+        parameters.encodings[0]
+            .maxBitrate =
+                profile.bitrate;
+
+
+        parameters.encodings[0]
+            .maxFramerate =
+                profile.fps;
+
+
+        await sender.setParameters(
+            parameters
+        );
+
+
+        console.log(
+            "Qualidade WebRTC:",
+            profile.label,
+            "Bitrate:",
+            profile.bitrate
+        );
+
+    }
+
+    catch (error) {
+
+        /*
+        Se o navegador não aceitar algum
+        parâmetro, a transmissão continua.
+        */
+
+        console.warn(
+            "Não foi possível aplicar todos os limites de qualidade:",
+            error
+        );
+
+    }
+
+}
+
+
+/*
+==============================
 CRIAR OFFER
 ==============================
 */
@@ -1228,18 +1806,30 @@ async function startOffer() {
         createPeer();
 
 
-    localStream
-        .getTracks()
-        .forEach(
-            track => {
+    for (
+        const track
+        of localStream.getTracks()
+    ) {
 
-                p.addTrack(
-                    track,
-                    localStream
-                );
+        const sender =
+            p.addTrack(
+                track,
+                localStream
+            );
 
-            }
-        );
+
+        if (
+            track.kind ===
+            "video"
+        ) {
+
+            await configureVideoSender(
+                sender
+            );
+
+        }
+
+    }
 
 
     const offer =
@@ -1285,6 +1875,7 @@ async () => {
         );
 
         return;
+
     }
 
 
@@ -1355,19 +1946,23 @@ async () => {
                         "none";
 
 
-                    /*
-                    Primeiro reservamos
-                    a transmissão no servidor.
-                    */
-
                     selectedSourceId =
                         source.id;
+
 
                     waitingBroadcastPermission =
                         true;
 
+
+                    const profile =
+                        getQualityProfile();
+
+
                     status.textContent =
-                        "Preparando transmissão...";
+                        "Preparando " +
+                        profile.label +
+                        "...";
+
 
                     shareButton.disabled =
                         true;
@@ -1413,6 +2008,7 @@ cancelSource.onclick =
 
         sourceModal.style.display =
             "none";
+
     };
 
 
@@ -1423,72 +2019,83 @@ CAPTURAR TELA
 */
 
 async function captureScreen(
-    sourceId
+    sourceId,
+    profile
 ) {
 
     /*
-    Primeiro tentamos capturar
-    VÍDEO + ÁUDIO DO SISTEMA.
-
-    Algumas fontes/versões do Windows
-    podem não disponibilizar áudio
-    dessa maneira.
-
-    Se falhar, fazemos automaticamente
-    uma segunda tentativa somente
-    com o vídeo.
+    Informa ao processo principal qual
+    tela/janela foi escolhida no nosso
+    seletor personalizado.
     */
+
+    const sourceAccepted =
+        await ipcRenderer.invoke(
+            "set-display-source",
+            sourceId
+        );
+
+
+    if (!sourceAccepted) {
+
+        throw new Error(
+            "A fonte selecionada não pôde ser preparada."
+        );
+
+    }
+
+
+    /*
+    O Electron escolhe a fonte no
+    setDisplayMediaRequestHandler()
+    do index.js.
+
+    No Windows, audio:true faz o
+    processo principal conceder
+    áudio por loopback.
+    */
+
+    const videoConstraints = {
+
+        width: {
+            max: profile.width
+        },
+
+        height: {
+            max: profile.height
+        },
+
+        frameRate: {
+            max: profile.fps
+        }
+
+    };
+
 
     try {
 
         const stream =
             await navigator.mediaDevices
-                .getUserMedia({
+                .getDisplayMedia({
 
-                    audio: {
+                    video:
+                        videoConstraints,
 
-                        mandatory: {
-
-                            chromeMediaSource:
-                                "desktop",
-
-                            chromeMediaSourceId:
-                                sourceId
-
-                        }
-
-                    },
-
-                    video: {
-
-                        mandatory: {
-
-                            chromeMediaSource:
-                                "desktop",
-
-                            chromeMediaSourceId:
-                                sourceId,
-
-                            maxWidth:
-                                1920,
-
-                            maxHeight:
-                                1080,
-
-                            maxFrameRate:
-                                60
-
-                        }
-
-                    }
+                    audio:
+                        true
 
                 });
 
 
+        const audioTracks =
+            stream.getAudioTracks();
+
+
         console.log(
-            "Captura iniciada com áudio.",
-            stream.getAudioTracks().length,
-            "faixa(s) de áudio."
+            "Áudio do sistema:",
+            audioTracks.length > 0
+                ? "ATIVO"
+                : "NÃO RECEBIDO"
         );
 
 
@@ -1499,47 +2106,28 @@ async function captureScreen(
     catch (audioError) {
 
         console.warn(
-            "Áudio do sistema indisponível. Tentando somente vídeo.",
+            "Captura com áudio loopback falhou. Tentando somente vídeo.",
             audioError
         );
 
 
+        /*
+        Mantém a transmissão funcionando
+        mesmo se o Windows/Electron não
+        disponibilizar o áudio.
+        */
+
         const stream =
             await navigator.mediaDevices
-                .getUserMedia({
+                .getDisplayMedia({
+
+                    video:
+                        videoConstraints,
 
                     audio:
-                        false,
-
-                    video: {
-
-                        mandatory: {
-
-                            chromeMediaSource:
-                                "desktop",
-
-                            chromeMediaSourceId:
-                                sourceId,
-
-                            maxWidth:
-                                1920,
-
-                            maxHeight:
-                                1080,
-
-                            maxFrameRate:
-                                60
-
-                        }
-
-                    }
+                        false
 
                 });
-
-
-        console.log(
-            "Captura iniciada sem áudio."
-        );
 
 
         return stream;
@@ -1568,15 +2156,35 @@ async function startSharing(
                     track.stop()
             );
 
+
         localStream =
             null;
+
     }
+
+
+    const profile =
+        getQualityProfile();
+
+
+    activeQualityProfile =
+        { ...profile };
+
+    activeCaptureSettings =
+        null;
 
 
     localStream =
         await captureScreen(
-            sourceId
+            sourceId,
+            activeQualityProfile
         );
+
+
+    systemAudioActive =
+        localStream
+            .getAudioTracks()
+            .length > 0;
 
 
     selectedSourceId =
@@ -1586,15 +2194,12 @@ async function startSharing(
     isBroadcasting =
         true;
 
+    updateQualityBadge();
+    updateAudioBadge();
+
     broadcastBusy =
         false;
 
-
-    /*
-    Mostramos a própria tela localmente.
-    O áudio fica MUDO localmente para
-    evitar eco/realimentação.
-    */
 
     video.srcObject =
         localStream;
@@ -1612,44 +2217,14 @@ async function startSharing(
     updateShareButton();
 
 
-    const audioTracks =
-        localStream
-            .getAudioTracks();
+    status.textContent =
+        "Transmitindo em " +
+        profile.label +
+        "...";
 
-
-    if (
-        audioTracks.length > 0
-    ) {
-
-        status.textContent =
-            "Transmitindo tela + áudio...";
-
-    }
-
-    else {
-
-        status.textContent =
-            "Transmitindo tela (áudio indisponível nesta fonte)...";
-
-    }
-
-
-    /*
-    AGORA QUALQUER UM PODE SER
-    O TRANSMISSOR.
-
-    Não existe mais:
-    if (isHost)
-    */
 
     await startOffer();
 
-
-    /*
-    Se a captura for encerrada pelo
-    Windows/navegador, encerramos também
-    a transmissão da sala.
-    */
 
     const videoTrack =
         localStream
@@ -1657,6 +2232,26 @@ async function startSharing(
 
 
     if (videoTrack) {
+
+        const settings =
+            videoTrack.getSettings();
+
+        activeCaptureSettings =
+            settings;
+
+        updateQualityBadge();
+
+
+        console.log(
+            "Captura:",
+            settings.width,
+            "x",
+            settings.height,
+            "@",
+            settings.frameRate,
+            "FPS"
+        );
+
 
         videoTrack.onended =
             () => {
@@ -1695,13 +2290,27 @@ function stopLocalTransmission(
                     track.stop()
             );
 
+
         localStream =
             null;
+
     }
 
 
     isBroadcasting =
         false;
+
+    activeQualityProfile =
+        null;
+
+    activeCaptureSettings =
+        null;
+
+    systemAudioActive =
+        false;
+
+    updateQualityBadge();
+    updateAudioBadge();
 
     waitingBroadcastPermission =
         false;
@@ -1747,11 +2356,6 @@ function stopTransmission() {
     }
 
 
-    /*
-    Avisamos o receptor para
-    remover a imagem imediatamente.
-    */
-
     socket.emit(
         "signal",
         {
@@ -1760,10 +2364,6 @@ function stopTransmission() {
         }
     );
 
-
-    /*
-    Liberamos a vez no servidor.
-    */
 
     socket.emit(
         "stop-broadcast"
@@ -1810,6 +2410,7 @@ function closePeer() {
             peer.onconnectionstatechange =
                 null;
 
+
             peer.close();
 
         }
@@ -1838,6 +2439,367 @@ function closePeer() {
 
 /*
 ==============================
+ATUALIZAÇÕES DO KSF SCREEN
+==============================
+*/
+
+async function loadAppVersion() {
+
+    try {
+
+        const version =
+            await ipcRenderer.invoke(
+                "get-app-version"
+            );
+
+
+        appVersion.textContent =
+            "v" + version;
+
+        updateMessage.textContent =
+            "KSF Screen v" +
+            version +
+            " pronto.";
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Erro ao ler versão:",
+            error
+        );
+
+        updateMessage.textContent =
+            "Não foi possível ler a versão.";
+
+    }
+
+}
+
+
+function resetUpdateButtons() {
+
+    checkUpdateButton.style.display =
+        "block";
+
+    checkUpdateButton.disabled =
+        false;
+
+    downloadUpdateButton.style.display =
+        "none";
+
+    installUpdateButton.style.display =
+        "none";
+
+}
+
+
+checkUpdateButton.onclick =
+    async () => {
+
+        checkUpdateButton.disabled =
+            true;
+
+        updateMessage.textContent =
+            "Verificando atualizações...";
+
+        updateProgressWrap.style.display =
+            "none";
+
+
+        try {
+
+            const result =
+                await ipcRenderer.invoke(
+                    "check-for-updates"
+                );
+
+
+            if (
+                result &&
+                result.development
+            ) {
+
+                updateMessage.textContent =
+                    "Modo de desenvolvimento. O updater real funciona na versão instalada.";
+
+                checkUpdateButton.disabled =
+                    false;
+
+            }
+
+
+            else if (
+                result &&
+                result.success === false
+            ) {
+
+                updateMessage.textContent =
+                    "Não foi possível verificar atualizações.";
+
+                checkUpdateButton.disabled =
+                    false;
+
+            }
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Erro ao verificar atualização:",
+                error
+            );
+
+            updateMessage.textContent =
+                "Erro ao verificar atualizações.";
+
+            checkUpdateButton.disabled =
+                false;
+
+        }
+
+    };
+
+
+downloadUpdateButton.onclick =
+    async () => {
+
+        downloadUpdateButton.disabled =
+            true;
+
+        updateProgressWrap.style.display =
+            "block";
+
+        updateProgress.style.width =
+            "0%";
+
+        updateMessage.textContent =
+            "Preparando download...";
+
+
+        try {
+
+            const result =
+                await ipcRenderer.invoke(
+                    "download-update"
+                );
+
+
+            if (
+                result &&
+                result.success === false
+            ) {
+
+                updateMessage.textContent =
+                    "Não foi possível baixar a atualização.";
+
+                downloadUpdateButton.disabled =
+                    false;
+
+            }
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Erro ao baixar atualização:",
+                error
+            );
+
+            updateMessage.textContent =
+                "Erro ao baixar atualização.";
+
+            downloadUpdateButton.disabled =
+                false;
+
+        }
+
+    };
+
+
+installUpdateButton.onclick =
+    async () => {
+
+        installUpdateButton.disabled =
+            true;
+
+        updateMessage.textContent =
+            "Reiniciando para atualizar...";
+
+
+        try {
+
+            await ipcRenderer.invoke(
+                "install-update"
+            );
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Erro ao instalar atualização:",
+                error
+            );
+
+            updateMessage.textContent =
+                "Erro ao iniciar a instalação.";
+
+            installUpdateButton.disabled =
+                false;
+
+        }
+
+    };
+
+
+ipcRenderer.on(
+    "update-status",
+    (
+        event,
+        data
+    ) => {
+
+        if (!data) {
+            return;
+        }
+
+
+        if (
+            data.status ===
+            "checking"
+        ) {
+
+            updateMessage.textContent =
+                "Verificando atualizações...";
+
+            checkUpdateButton.disabled =
+                true;
+
+        }
+
+
+        else if (
+            data.status ===
+            "available"
+        ) {
+
+            updateMessage.textContent =
+                "Nova versão disponível: v" +
+                data.version;
+
+            checkUpdateButton.style.display =
+                "none";
+
+            downloadUpdateButton.style.display =
+                "block";
+
+            downloadUpdateButton.disabled =
+                false;
+
+            installUpdateButton.style.display =
+                "none";
+
+        }
+
+
+        else if (
+            data.status ===
+            "not-available"
+        ) {
+
+            updateMessage.textContent =
+                "Você já está na versão mais recente.";
+
+            resetUpdateButtons();
+
+        }
+
+
+        else if (
+            data.status ===
+            "downloading"
+        ) {
+
+            const percent =
+                Number(data.percent) || 0;
+
+            updateProgressWrap.style.display =
+                "block";
+
+            updateProgress.style.width =
+                Math.max(
+                    0,
+                    Math.min(
+                        100,
+                        percent
+                    )
+                ) + "%";
+
+            updateMessage.textContent =
+                "Baixando atualização... " +
+                percent +
+                "%";
+
+        }
+
+
+        else if (
+            data.status ===
+            "downloaded"
+        ) {
+
+            updateProgressWrap.style.display =
+                "block";
+
+            updateProgress.style.width =
+                "100%";
+
+            updateMessage.textContent =
+                "Versão v" +
+                data.version +
+                " pronta para instalar.";
+
+            checkUpdateButton.style.display =
+                "none";
+
+            downloadUpdateButton.style.display =
+                "none";
+
+            installUpdateButton.style.display =
+                "block";
+
+            installUpdateButton.disabled =
+                false;
+
+        }
+
+
+        else if (
+            data.status ===
+            "error"
+        ) {
+
+            updateMessage.textContent =
+                "Erro no atualizador: " +
+                (
+                    data.message ||
+                    "erro desconhecido"
+                );
+
+            resetUpdateButtons();
+
+        }
+
+    }
+);
+
+
+/*
+==============================
 ESTADO INICIAL
 ==============================
 */
@@ -1845,7 +2807,16 @@ ESTADO INICIAL
 video.style.display =
     "none";
 
+qualitySelect.value =
+    "auto";
+
+qualityDescription.textContent =
+    qualityProfiles.auto.description;
+
 updateShareButton();
+updateAudioBadge();
+resetUpdateButtons();
+loadAppVersion();
 
 </script>
 
