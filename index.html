@@ -726,6 +726,13 @@ let isBroadcasting = false;
 let activeQualityProfile = null;
 let activeCaptureSettings = null;
 let systemAudioActive = false;
+let activeAudioMode = "none";
+
+let nativeAudioContext = null;
+let nativeAudioDestination = null;
+let nativeAudioPollTimer = null;
+let nativeAudioReadBusy = false;
+let nativeAudioNextTime = 0;
 
 
 /*
@@ -893,7 +900,9 @@ function updateAudioBadge() {
     ) {
 
         audioBadgeText.textContent =
-            "Áudio do PC";
+            activeAudioMode === "window"
+                ? "Áudio da janela"
+                : "Áudio do PC";
 
         audioBadge.classList.add(
             "active"
@@ -2014,6 +2023,388 @@ cancelSource.onclick =
 
 /*
 ==============================
+ÁUDIO ISOLADO DA JANELA
+PCM C++ -> WEB AUDIO -> MEDIASTREAM
+==============================
+*/
+
+async function stopNativeWindowAudioBridge() {
+
+    if (nativeAudioPollTimer) {
+
+        clearInterval(
+            nativeAudioPollTimer
+        );
+
+        nativeAudioPollTimer =
+            null;
+
+    }
+
+
+    nativeAudioReadBusy =
+        false;
+
+    nativeAudioNextTime =
+        0;
+
+
+    try {
+
+        await ipcRenderer.invoke(
+            "stop-native-audio"
+        );
+
+    }
+
+    catch (error) {
+
+        console.warn(
+            "Erro ao parar áudio nativo:",
+            error
+        );
+
+    }
+
+
+    if (nativeAudioContext) {
+
+        try {
+
+            await nativeAudioContext.close();
+
+        }
+
+        catch (error) {
+
+            console.warn(
+                "Erro ao fechar AudioContext:",
+                error
+            );
+
+        }
+
+    }
+
+
+    nativeAudioContext =
+        null;
+
+    nativeAudioDestination =
+        null;
+}
+
+
+function pcm16StereoToAudioBuffer(
+    pcmBytes,
+    audioContext,
+    sampleRate
+) {
+
+    if (!pcmBytes) {
+        return null;
+    }
+
+
+    const bytes =
+        Buffer.isBuffer(pcmBytes)
+            ? pcmBytes
+            : Buffer.from(pcmBytes);
+
+
+    const bytesPerFrame = 4;
+
+    const frameCount =
+        Math.floor(
+            bytes.length /
+            bytesPerFrame
+        );
+
+
+    if (frameCount <= 0) {
+        return null;
+    }
+
+
+    const audioBuffer =
+        audioContext.createBuffer(
+            2,
+            frameCount,
+            sampleRate
+        );
+
+
+    const left =
+        audioBuffer.getChannelData(0);
+
+    const right =
+        audioBuffer.getChannelData(1);
+
+
+    for (
+        let frame = 0;
+        frame < frameCount;
+        frame++
+    ) {
+
+        const offset =
+            frame * bytesPerFrame;
+
+
+        const leftSample =
+            bytes.readInt16LE(
+                offset
+            );
+
+        const rightSample =
+            bytes.readInt16LE(
+                offset + 2
+            );
+
+
+        left[frame] =
+            leftSample / 32768;
+
+        right[frame] =
+            rightSample / 32768;
+
+    }
+
+
+    return audioBuffer;
+}
+
+
+async function startNativeWindowAudioBridge() {
+
+    await stopNativeWindowAudioBridge();
+
+
+    const result =
+        await ipcRenderer.invoke(
+            "start-native-window-audio"
+        );
+
+
+    if (
+        !result ||
+        !result.success
+    ) {
+
+        throw new Error(
+            "Não foi possível iniciar o áudio isolado da janela: " +
+            (
+                result &&
+                (
+                    result.error ||
+                    result.reason
+                )
+                    ? (
+                        result.error ||
+                        result.reason
+                    )
+                    : "erro desconhecido"
+            )
+        );
+
+    }
+
+
+    const sampleRate =
+        Number(result.sampleRate) ||
+        44100;
+
+
+    nativeAudioContext =
+        new AudioContext({
+            sampleRate:
+                sampleRate
+        });
+
+
+    await nativeAudioContext.resume();
+
+
+    nativeAudioDestination =
+        nativeAudioContext
+            .createMediaStreamDestination();
+
+
+    nativeAudioNextTime =
+        nativeAudioContext.currentTime +
+        0.06;
+
+
+    console.log(
+        "Ponte de áudio isolado iniciada:",
+        {
+            pid:
+                result.pid,
+            sampleRate:
+                sampleRate,
+            channels:
+                result.channels,
+            bitsPerSample:
+                result.bitsPerSample
+        }
+    );
+
+
+    nativeAudioPollTimer =
+        setInterval(
+            async () => {
+
+                if (
+                    nativeAudioReadBusy ||
+                    !nativeAudioContext ||
+                    !nativeAudioDestination
+                ) {
+                    return;
+                }
+
+
+                nativeAudioReadBusy =
+                    true;
+
+
+                try {
+
+                    /*
+                    Lê até aproximadamente 200 ms
+                    de PCM por chamada.
+
+                    44100 Hz * 4 bytes por frame
+                    * 0.2 segundo = 35280 bytes.
+                    */
+
+                    const pcm =
+                        await ipcRenderer.invoke(
+                            "read-native-audio",
+                            35280
+                        );
+
+
+                    if (
+                        !pcm ||
+                        pcm.length === 0
+                    ) {
+                        return;
+                    }
+
+
+                    const audioBuffer =
+                        pcm16StereoToAudioBuffer(
+                            pcm,
+                            nativeAudioContext,
+                            sampleRate
+                        );
+
+
+                    if (!audioBuffer) {
+                        return;
+                    }
+
+
+                    const source =
+                        nativeAudioContext
+                            .createBufferSource();
+
+
+                    source.buffer =
+                        audioBuffer;
+
+
+                    source.connect(
+                        nativeAudioDestination
+                    );
+
+
+                    const minimumStart =
+                        nativeAudioContext.currentTime +
+                        0.03;
+
+
+                    if (
+                        nativeAudioNextTime <
+                        minimumStart
+                    ) {
+
+                        nativeAudioNextTime =
+                            minimumStart;
+
+                    }
+
+
+                    source.start(
+                        nativeAudioNextTime
+                    );
+
+
+                    nativeAudioNextTime +=
+                        audioBuffer.duration;
+
+
+                    source.onended =
+                        () => {
+
+                            try {
+
+                                source.disconnect();
+
+                            }
+
+                            catch (error) {
+                                // Ignora desconexão já concluída.
+                            }
+
+                        };
+
+                }
+
+                catch (error) {
+
+                    console.error(
+                        "Erro na ponte PCM -> Web Audio:",
+                        error
+                    );
+
+                }
+
+                finally {
+
+                    nativeAudioReadBusy =
+                        false;
+
+                }
+
+            },
+            10
+        );
+
+
+    const audioTrack =
+        nativeAudioDestination
+            .stream
+            .getAudioTracks()[0];
+
+
+    if (!audioTrack) {
+
+        await stopNativeWindowAudioBridge();
+
+        throw new Error(
+            "A ponte de áudio não criou uma MediaStreamTrack."
+        );
+
+    }
+
+
+    return audioTrack;
+}
+
+
+/*
+==============================
 CAPTURAR TELA
 ==============================
 */
@@ -2024,19 +2415,22 @@ async function captureScreen(
 ) {
 
     /*
-    Informa ao processo principal qual
-    tela/janela foi escolhida no nosso
-    seletor personalizado.
+    Prepara a fonte e recebe do processo
+    principal se ela é uma tela inteira
+    ou uma janela específica.
     */
 
-    const sourceAccepted =
+    const sourceInfo =
         await ipcRenderer.invoke(
             "set-display-source",
             sourceId
         );
 
 
-    if (!sourceAccepted) {
+    if (
+        !sourceInfo ||
+        sourceInfo.success !== true
+    ) {
 
         throw new Error(
             "A fonte selecionada não pôde ser preparada."
@@ -2045,15 +2439,16 @@ async function captureScreen(
     }
 
 
-    /*
-    O Electron escolhe a fonte no
-    setDisplayMediaRequestHandler()
-    do index.js.
+    const isWindow =
+        sourceInfo.type ===
+        "window";
 
-    No Windows, audio:true faz o
-    processo principal conceder
-    áudio por loopback.
-    */
+
+    console.log(
+        "Fonte de captura:",
+        sourceInfo
+    );
+
 
     const videoConstraints = {
 
@@ -2071,6 +2466,79 @@ async function captureScreen(
 
     };
 
+
+    /*
+    JANELA ESPECÍFICA
+
+    O vídeo vem do Electron normalmente,
+    mas NÃO pedimos o loopback geral.
+
+    Depois adicionamos ao stream somente
+    o áudio capturado pelo PID da janela.
+    */
+
+    if (isWindow) {
+
+        const stream =
+            await navigator.mediaDevices
+                .getDisplayMedia({
+
+                    video:
+                        videoConstraints,
+
+                    audio:
+                        false
+
+                });
+
+
+        try {
+
+            const isolatedAudioTrack =
+                await startNativeWindowAudioBridge();
+
+
+            stream.addTrack(
+                isolatedAudioTrack
+            );
+
+
+            activeAudioMode =
+                "window";
+
+
+            console.log(
+                "Áudio isolado da janela: ATIVO | PID:",
+                sourceInfo.pid
+            );
+
+        }
+
+        catch (audioError) {
+
+            activeAudioMode =
+                "none";
+
+
+            console.error(
+                "Áudio isolado da janela falhou. A transmissão continuará somente com vídeo.",
+                audioError
+            );
+
+        }
+
+
+        return stream;
+    }
+
+
+    /*
+    TELA INTEIRA
+
+    Continua usando o loopback normal do
+    Windows, pois nesse modo queremos todo
+    o áudio do computador.
+    */
 
     try {
 
@@ -2091,8 +2559,14 @@ async function captureScreen(
             stream.getAudioTracks();
 
 
+        activeAudioMode =
+            audioTracks.length > 0
+                ? "screen"
+                : "none";
+
+
         console.log(
-            "Áudio do sistema:",
+            "Áudio da tela inteira:",
             audioTracks.length > 0
                 ? "ATIVO"
                 : "NÃO RECEBIDO"
@@ -2106,16 +2580,14 @@ async function captureScreen(
     catch (audioError) {
 
         console.warn(
-            "Captura com áudio loopback falhou. Tentando somente vídeo.",
+            "Captura da tela inteira com áudio falhou. Tentando somente vídeo.",
             audioError
         );
 
 
-        /*
-        Mantém a transmissão funcionando
-        mesmo se o Windows/Electron não
-        disponibilizar o áudio.
-        */
+        activeAudioMode =
+            "none";
+
 
         const stream =
             await navigator.mediaDevices
@@ -2131,11 +2603,9 @@ async function captureScreen(
 
 
         return stream;
-
     }
 
 }
-
 
 /*
 ==============================
@@ -2148,6 +2618,8 @@ async function startSharing(
 ) {
 
     if (localStream) {
+
+        stopNativeWindowAudioBridge();
 
         localStream
             .getTracks()
@@ -2281,6 +2753,8 @@ function stopLocalTransmission(
     resetStatus = true
 ) {
 
+    stopNativeWindowAudioBridge();
+
     if (localStream) {
 
         localStream
@@ -2308,6 +2782,9 @@ function stopLocalTransmission(
 
     systemAudioActive =
         false;
+
+    activeAudioMode =
+        "none";
 
     updateQualityBadge();
     updateAudioBadge();

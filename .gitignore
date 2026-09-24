@@ -1,2 +1,13 @@
-node_modules/ 
+node_modules/
 dist/
+
+# Backups locais
+*.backup-*.js
+*.backup-*.html
+*.backup-*.json
+
+# Arquivos temporários do node-gyp
+native-audio/build/*
+!native-audio/build/Release/
+native-audio/build/Release/*
+!native-audio/build/Release/ksf_audio.node
