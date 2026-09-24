@@ -11,9 +11,35 @@ const io = new Server(server, {
     }
 });
 
+
 // Local = 3000
 // Online = usa automaticamente a porta fornecida pelo servidor
-const PORT = process.env.PORT || 3000;
+const PORT =
+    process.env.PORT || 3000;
+
+
+/*
+================================
+SALAS
+
+Cada sala possui:
+
+{
+    hostId: "socket-id",
+
+    nextParticipantNumber: 4,
+
+    participants: Map {
+        socketId => {
+            id,
+            name,
+            isHost,
+            broadcasting
+        }
+    }
+}
+================================
+*/
 
 const rooms = new Map();
 
@@ -24,14 +50,201 @@ PÁGINA DE TESTE
 ================================
 */
 
-app.get("/", (req, res) => {
+app.get(
+    "/",
+    (req, res) => {
 
-    res.send(`
-        <h1>KSF Screen Server</h1>
-        <p>Servidor online e funcionando!</p>
-    `);
+        res.send(`
+            <h1>KSF Screen Server</h1>
+            <p>Servidor Multi-Stream online e funcionando!</p>
+            <p>KSF Screen Server V0.6.0</p>
+        `);
 
-});
+    }
+);
+
+
+/*
+================================
+NORMALIZAR CÓDIGO DA SALA
+================================
+*/
+
+function normalizeRoomCode(
+    roomCode
+) {
+
+    return String(
+        roomCode || ""
+    )
+        .trim()
+        .toUpperCase();
+
+}
+
+
+/*
+================================
+PEGAR SALA DO SOCKET
+================================
+*/
+
+function getSocketRoom(
+    socket
+) {
+
+    const roomCode =
+        socket.data.roomCode;
+
+
+    if (!roomCode) {
+
+        return {
+            roomCode: null,
+            room: null
+        };
+
+    }
+
+
+    return {
+        roomCode,
+        room:
+            rooms.get(roomCode) ||
+            null
+    };
+
+}
+
+
+/*
+================================
+CRIAR DADOS DO PARTICIPANTE
+================================
+*/
+
+function createParticipant(
+    socket,
+    room,
+    isHost
+) {
+
+    const participantNumber =
+        room.nextParticipantNumber;
+
+
+    room.nextParticipantNumber += 1;
+
+
+    return {
+
+        id:
+            socket.id,
+
+        name:
+            "Amigo " +
+            participantNumber,
+
+        isHost:
+            Boolean(isHost),
+
+        broadcasting:
+            false
+
+    };
+
+}
+
+
+/*
+================================
+ESTADO PÚBLICO DA SALA
+================================
+*/
+
+function getRoomState(
+    room
+) {
+
+    return Array
+        .from(
+            room.participants.values()
+        )
+        .map(
+            participant => ({
+
+                id:
+                    participant.id,
+
+                name:
+                    participant.name,
+
+                isHost:
+                    participant.isHost,
+
+                broadcasting:
+                    participant.broadcasting
+
+            })
+        );
+
+}
+
+
+/*
+================================
+ENVIAR ESTADO DA SALA
+================================
+*/
+
+function emitRoomState(
+    roomCode
+) {
+
+    const room =
+        rooms.get(roomCode);
+
+
+    if (!room) {
+        return;
+    }
+
+
+    io
+        .to(roomCode)
+        .emit(
+            "room-state",
+            {
+                roomCode,
+
+                participants:
+                    getRoomState(room)
+            }
+        );
+
+}
+
+
+/*
+================================
+VALIDAR PARTICIPANTE DA SALA
+================================
+*/
+
+function isParticipantInRoom(
+    room,
+    socketId
+) {
+
+    return Boolean(
+        room &&
+        socketId &&
+        room.participants.has(
+            socketId
+        )
+    );
+
+}
 
 
 /*
@@ -40,465 +253,848 @@ SOCKET.IO
 ================================
 */
 
-io.on("connection", (socket) => {
+io.on(
+    "connection",
+    socket => {
 
-    console.log(
-        "Novo usuário conectado:",
-        socket.id
-    );
-
-
-    /*
-    ================================
-    CRIAR SALA
-    ================================
-    */
-
-    socket.on(
-        "create-room",
-        (roomCode) => {
-
-            roomCode =
-                String(roomCode)
-                    .trim()
-                    .toUpperCase();
+        console.log(
+            "Novo usuário conectado:",
+            socket.id
+        );
 
 
-            if (rooms.has(roomCode)) {
+        /*
+        ================================
+        CRIAR SALA
+        ================================
+        */
 
-                socket.emit(
-                    "room-error",
-                    "Essa sala já existe."
-                );
+        socket.on(
+            "create-room",
+            rawRoomCode => {
 
-                return;
-            }
+                const roomCode =
+                    normalizeRoomCode(
+                        rawRoomCode
+                    );
 
 
-            rooms.set(
-                roomCode,
-                {
-                    host: socket.id,
-                    guest: null,
+                if (
+                    roomCode.length !== 6
+                ) {
 
-                    // ID de quem está transmitindo.
-                    // null = ninguém transmitindo.
-                    broadcaster: null
+                    socket.emit(
+                        "room-error",
+                        "Código de sala inválido."
+                    );
+
+                    return;
                 }
-            );
 
 
-            socket.join(roomCode);
+                if (
+                    rooms.has(roomCode)
+                ) {
+
+                    socket.emit(
+                        "room-error",
+                        "Essa sala já existe."
+                    );
+
+                    return;
+                }
 
 
-            socket.data.roomCode =
-                roomCode;
+                /*
+                A numeração começa no Amigo 1.
 
-            socket.data.isHost =
-                true;
+                Mais para frente, quando existir
+                conta/login, este nome temporário
+                será substituído pelo username.
+                */
 
+                const room = {
 
-            console.log(
-                "Sala criada:",
-                roomCode
-            );
+                    hostId:
+                        socket.id,
 
+                    nextParticipantNumber:
+                        1,
 
-            socket.emit(
-                "room-created",
-                roomCode
-            );
+                    participants:
+                        new Map()
 
-        }
-    );
-
-
-    /*
-    ================================
-    ENTRAR NA SALA
-    ================================
-    */
-
-    socket.on(
-        "join-room",
-        (roomCode) => {
-
-            roomCode =
-                String(roomCode)
-                    .trim()
-                    .toUpperCase();
+                };
 
 
-            const room =
-                rooms.get(roomCode);
+                const participant =
+                    createParticipant(
+                        socket,
+                        room,
+                        true
+                    );
 
 
-            if (!room) {
-
-                socket.emit(
-                    "room-error",
-                    "Sala não encontrada."
+                room.participants.set(
+                    socket.id,
+                    participant
                 );
 
-                return;
-            }
 
-
-            if (room.guest) {
-
-                socket.emit(
-                    "room-error",
-                    "Essa sala já está cheia."
+                rooms.set(
+                    roomCode,
+                    room
                 );
 
-                return;
-            }
 
-
-            room.guest =
-                socket.id;
-
-
-            socket.join(
-                roomCode
-            );
-
-
-            socket.data.roomCode =
-                roomCode;
-
-            socket.data.isHost =
-                false;
-
-
-            console.log(
-                "Amigo entrou na sala:",
-                roomCode
-            );
-
-
-            socket.emit(
-                "room-joined",
-                roomCode
-            );
-
-
-            io.to(
-                room.host
-            ).emit(
-                "friend-joined"
-            );
-
-
-            /*
-            Informa ao novo usuário
-            se alguém já está transmitindo.
-            */
-
-            if (room.broadcaster) {
-
-                socket.emit(
-                    "broadcast-busy"
-                );
-
-            }
-
-        }
-    );
-
-
-    /*
-    ================================
-    PEDIR PARA TRANSMITIR
-    ================================
-    */
-
-    socket.on(
-        "request-broadcast",
-        () => {
-
-            const roomCode =
-                socket.data.roomCode;
-
-
-            if (!roomCode) {
-                return;
-            }
-
-
-            const room =
-                rooms.get(roomCode);
-
-
-            if (!room) {
-                return;
-            }
-
-
-            /*
-            Se outra pessoa já estiver
-            transmitindo, bloqueia.
-            */
-
-            if (
-                room.broadcaster &&
-                room.broadcaster !== socket.id
-            ) {
-
-                socket.emit(
-                    "broadcast-denied"
-                );
-
-                return;
-            }
-
-
-            /*
-            Reserva a transmissão
-            para este usuário.
-            */
-
-            room.broadcaster =
-                socket.id;
-
-
-            console.log(
-                "Transmissão iniciada:",
-                roomCode,
-                socket.id
-            );
-
-
-            /*
-            Quem pediu recebe autorização.
-            */
-
-            socket.emit(
-                "broadcast-granted"
-            );
-
-
-            /*
-            O outro usuário fica sabendo
-            que a sala está ocupada.
-            */
-
-            socket
-                .to(roomCode)
-                .emit(
-                    "broadcast-started"
-                );
-
-        }
-    );
-
-
-    /*
-    ================================
-    PARAR TRANSMISSÃO
-    ================================
-    */
-
-    socket.on(
-        "stop-broadcast",
-        () => {
-
-            const roomCode =
-                socket.data.roomCode;
-
-
-            if (!roomCode) {
-                return;
-            }
-
-
-            const room =
-                rooms.get(roomCode);
-
-
-            if (!room) {
-                return;
-            }
-
-
-            /*
-            Somente quem está transmitindo
-            pode liberar a transmissão.
-            */
-
-            if (
-                room.broadcaster ===
-                socket.id
-            ) {
-
-                room.broadcaster =
-                    null;
-
-
-                console.log(
-                    "Transmissão encerrada:",
+                socket.join(
                     roomCode
                 );
 
 
+                socket.data.roomCode =
+                    roomCode;
+
+                socket.data.isHost =
+                    true;
+
+
+                console.log(
+                    "Sala criada:",
+                    roomCode,
+                    "| Host:",
+                    socket.id
+                );
+
+
+                socket.emit(
+                    "room-created",
+                    {
+                        roomCode,
+
+                        selfId:
+                            socket.id,
+
+                        participant
+                    }
+                );
+
+
+                emitRoomState(
+                    roomCode
+                );
+
+            }
+        );
+
+
+        /*
+        ================================
+        ENTRAR NA SALA
+        ================================
+        */
+
+        socket.on(
+            "join-room",
+            rawRoomCode => {
+
+                const roomCode =
+                    normalizeRoomCode(
+                        rawRoomCode
+                    );
+
+
+                const room =
+                    rooms.get(
+                        roomCode
+                    );
+
+
+                if (!room) {
+
+                    socket.emit(
+                        "room-error",
+                        "Sala não encontrada."
+                    );
+
+                    return;
+                }
+
+
                 /*
-                Avisa o outro usuário que
-                agora ele pode transmitir.
+                Evita que o mesmo socket seja
+                adicionado duas vezes.
+                */
+
+                if (
+                    room.participants.has(
+                        socket.id
+                    )
+                ) {
+
+                    socket.emit(
+                        "room-joined",
+                        {
+                            roomCode,
+
+                            selfId:
+                                socket.id,
+
+                            participant:
+                                room.participants.get(
+                                    socket.id
+                                )
+                        }
+                    );
+
+                    emitRoomState(
+                        roomCode
+                    );
+
+                    return;
+                }
+
+
+                const participant =
+                    createParticipant(
+                        socket,
+                        room,
+                        false
+                    );
+
+
+                room.participants.set(
+                    socket.id,
+                    participant
+                );
+
+
+                socket.join(
+                    roomCode
+                );
+
+
+                socket.data.roomCode =
+                    roomCode;
+
+                socket.data.isHost =
+                    false;
+
+
+                console.log(
+                    "Participante entrou:",
+                    roomCode,
+                    participant.name,
+                    socket.id
+                );
+
+
+                socket.emit(
+                    "room-joined",
+                    {
+                        roomCode,
+
+                        selfId:
+                            socket.id,
+
+                        participant
+                    }
+                );
+
+
+                /*
+                Todos recebem a lista atualizada.
+                */
+
+                emitRoomState(
+                    roomCode
+                );
+
+            }
+        );
+
+
+        /*
+        ================================
+        COMEÇAR TRANSMISSÃO
+
+        Não existe mais bloqueio de broadcaster.
+
+        Cada participante controla somente
+        o próprio estado de transmissão.
+        ================================
+        */
+
+        socket.on(
+            "start-broadcast",
+            () => {
+
+                const {
+                    roomCode,
+                    room
+                } =
+                    getSocketRoom(
+                        socket
+                    );
+
+
+                if (
+                    !roomCode ||
+                    !room
+                ) {
+                    return;
+                }
+
+
+                const participant =
+                    room.participants.get(
+                        socket.id
+                    );
+
+
+                if (!participant) {
+                    return;
+                }
+
+
+                participant.broadcasting =
+                    true;
+
+
+                console.log(
+                    "Transmissão iniciada:",
+                    roomCode,
+                    participant.name,
+                    socket.id
+                );
+
+
+                /*
+                Confirma somente para quem iniciou.
+                */
+
+                socket.emit(
+                    "broadcast-started-self"
+                );
+
+
+                /*
+                Atualiza os cards de todos.
+                */
+
+                emitRoomState(
+                    roomCode
+                );
+
+            }
+        );
+
+
+        /*
+        ================================
+        PARAR TRANSMISSÃO
+        ================================
+        */
+
+        socket.on(
+            "stop-broadcast",
+            () => {
+
+                const {
+                    roomCode,
+                    room
+                } =
+                    getSocketRoom(
+                        socket
+                    );
+
+
+                if (
+                    !roomCode ||
+                    !room
+                ) {
+                    return;
+                }
+
+
+                const participant =
+                    room.participants.get(
+                        socket.id
+                    );
+
+
+                if (!participant) {
+                    return;
+                }
+
+
+                if (
+                    !participant.broadcasting
+                ) {
+                    return;
+                }
+
+
+                participant.broadcasting =
+                    false;
+
+
+                console.log(
+                    "Transmissão encerrada:",
+                    roomCode,
+                    participant.name,
+                    socket.id
+                );
+
+
+                /*
+                Quem estiver assistindo esta pessoa
+                precisa fechar somente essa conexão.
+
+                Isso NÃO encerra a sala e NÃO afeta
+                transmissões de outros participantes.
                 */
 
                 socket
                     .to(roomCode)
                     .emit(
-                        "broadcast-stopped"
-                    );
-
-            }
-
-        }
-    );
-
-
-    /*
-    ================================
-    SINALIZAÇÃO WEBRTC
-    ================================
-    */
-
-    socket.on(
-        "signal",
-        (data) => {
-
-            const roomCode =
-                socket.data.roomCode;
-
-
-            if (!roomCode) {
-                return;
-            }
-
-
-            socket
-                .to(roomCode)
-                .emit(
-                    "signal",
-                    data
-                );
-
-        }
-    );
-
-
-    /*
-    ================================
-    DESCONEXÃO
-    ================================
-    */
-
-    socket.on(
-        "disconnect",
-        () => {
-
-            const roomCode =
-                socket.data.roomCode;
-
-
-            if (!roomCode) {
-                return;
-            }
-
-
-            const room =
-                rooms.get(roomCode);
-
-
-            if (!room) {
-                return;
-            }
-
-
-            /*
-            Se quem saiu estava transmitindo,
-            libera a transmissão.
-            */
-
-            if (
-                room.broadcaster ===
-                socket.id
-            ) {
-
-                room.broadcaster =
-                    null;
-
-
-                socket
-                    .to(roomCode)
-                    .emit(
-                        "broadcast-stopped"
-                    );
-
-            }
-
-
-            /*
-            HOST SAIU
-            */
-
-            if (
-                socket.data.isHost
-            ) {
-
-                socket
-                    .to(roomCode)
-                    .emit(
-                        "host-left"
+                        "participant-broadcast-stopped",
+                        {
+                            participantId:
+                                socket.id
+                        }
                     );
 
 
-                rooms.delete(
-                    roomCode
-                );
-
-
-                console.log(
-                    "Sala encerrada:",
+                emitRoomState(
                     roomCode
                 );
 
             }
+        );
 
 
-            /*
-            AMIGO SAIU
-            */
+        /*
+        ================================
+        PEDIR PARA ASSISTIR
 
-            else {
+        O espectador escolheu explicitamente
+        uma transmissão.
 
-                room.guest =
-                    null;
+        Somente o transmissor escolhido recebe
+        o pedido.
 
+        Nenhum áudio/vídeo é enviado simplesmente
+        por estar dentro da sala.
+        ================================
+        */
 
-                if (room.host) {
+        socket.on(
+            "watch-stream",
+            data => {
 
-                    io.to(
-                        room.host
-                    ).emit(
-                        "friend-left"
+                const {
+                    roomCode,
+                    room
+                } =
+                    getSocketRoom(
+                        socket
                     );
 
+
+                if (
+                    !roomCode ||
+                    !room
+                ) {
+                    return;
+                }
+
+
+                const broadcasterId =
+                    data &&
+                    typeof data.broadcasterId ===
+                        "string"
+
+                        ? data.broadcasterId
+                        : null;
+
+
+                if (
+                    !broadcasterId ||
+                    broadcasterId ===
+                        socket.id
+                ) {
+
+                    return;
+                }
+
+
+                const broadcaster =
+                    room.participants.get(
+                        broadcasterId
+                    );
+
+
+                if (
+                    !broadcaster ||
+                    !broadcaster.broadcasting
+                ) {
+
+                    socket.emit(
+                        "watch-error",
+                        {
+                            broadcasterId,
+
+                            message:
+                                "Essa transmissão não está mais disponível."
+                        }
+                    );
+
+                    return;
                 }
 
 
                 console.log(
-                    "Amigo saiu da sala:",
+                    "Pedido para assistir:",
+                    socket.id,
+                    "->",
+                    broadcasterId
+                );
+
+
+                /*
+                Somente o transmissor escolhido
+                recebe o ID de quem quer assistir.
+                */
+
+                io
+                    .to(broadcasterId)
+                    .emit(
+                        "viewer-request",
+                        {
+                            viewerId:
+                                socket.id
+                        }
+                    );
+
+            }
+        );
+
+
+        /*
+        ================================
+        PARAR DE ASSISTIR
+
+        O espectador continua dentro da sala.
+
+        Apenas a conexão entre ele e o
+        transmissor selecionado é encerrada.
+        ================================
+        */
+
+        socket.on(
+            "stop-watching",
+            data => {
+
+                const {
+                    roomCode,
+                    room
+                } =
+                    getSocketRoom(
+                        socket
+                    );
+
+
+                if (
+                    !roomCode ||
+                    !room
+                ) {
+                    return;
+                }
+
+
+                const broadcasterId =
+                    data &&
+                    typeof data.broadcasterId ===
+                        "string"
+
+                        ? data.broadcasterId
+                        : null;
+
+
+                if (
+                    !broadcasterId ||
+                    !isParticipantInRoom(
+                        room,
+                        broadcasterId
+                    )
+                ) {
+
+                    return;
+                }
+
+
+                console.log(
+                    "Parou de assistir:",
+                    socket.id,
+                    "->",
+                    broadcasterId
+                );
+
+
+                io
+                    .to(broadcasterId)
+                    .emit(
+                        "viewer-left",
+                        {
+                            viewerId:
+                                socket.id
+                        }
+                    );
+
+            }
+        );
+
+
+        /*
+        ================================
+        SINALIZAÇÃO WEBRTC DIRECIONADA
+
+        Antes:
+        signal -> toda a sala
+
+        Agora:
+        signal -> somente targetId
+
+        Isso é fundamental para o Multi-Stream.
+        ================================
+        */
+
+        socket.on(
+            "signal",
+            data => {
+
+                const {
+                    room,
+                    roomCode
+                } =
+                    getSocketRoom(
+                        socket
+                    );
+
+
+                if (
+                    !room ||
+                    !roomCode ||
+                    !data
+                ) {
+                    return;
+                }
+
+
+                const targetId =
+                    typeof data.targetId ===
+                        "string"
+
+                        ? data.targetId
+                        : null;
+
+
+                if (
+                    !targetId ||
+                    targetId ===
+                        socket.id
+                ) {
+
+                    return;
+                }
+
+
+                /*
+                Impede sinalização para alguém
+                que não pertence à mesma sala.
+                */
+
+                if (
+                    !isParticipantInRoom(
+                        room,
+                        targetId
+                    )
+                ) {
+
+                    return;
+                }
+
+
+                /*
+                O servidor acrescenta sourceId.
+
+                Assim quem recebe sabe exatamente
+                de qual participante veio o sinal.
+                */
+
+                io
+                    .to(targetId)
+                    .emit(
+                        "signal",
+                        {
+                            sourceId:
+                                socket.id,
+
+                            type:
+                                data.type,
+
+                            sdp:
+                                data.sdp,
+
+                            candidate:
+                                data.candidate
+                        }
+                    );
+
+            }
+        );
+
+
+        /*
+        ================================
+        DESCONEXÃO
+        ================================
+        */
+
+        socket.on(
+            "disconnect",
+            () => {
+
+                const roomCode =
+                    socket.data.roomCode;
+
+
+                if (!roomCode) {
+                    return;
+                }
+
+
+                const room =
+                    rooms.get(
+                        roomCode
+                    );
+
+
+                if (!room) {
+                    return;
+                }
+
+
+                const participant =
+                    room.participants.get(
+                        socket.id
+                    );
+
+
+                /*
+                Remove o participante da sala.
+                */
+
+                room.participants.delete(
+                    socket.id
+                );
+
+
+                console.log(
+                    "Participante saiu:",
+                    roomCode,
+                    participant
+                        ? participant.name
+                        : socket.id
+                );
+
+
+                /*
+                Avisa todos para fecharem qualquer
+                conexão WebRTC relacionada a quem saiu.
+                */
+
+                socket
+                    .to(roomCode)
+                    .emit(
+                        "participant-left",
+                        {
+                            participantId:
+                                socket.id
+                        }
+                    );
+
+
+                /*
+                HOST SAIU
+
+                Mantemos o comportamento atual:
+                se o criador sair, a sala é encerrada.
+
+                Podemos mudar isso futuramente para
+                transferir a liderança.
+                */
+
+                if (
+                    room.hostId ===
+                    socket.id
+                ) {
+
+                    socket
+                        .to(roomCode)
+                        .emit(
+                            "host-left"
+                        );
+
+
+                    rooms.delete(
+                        roomCode
+                    );
+
+
+                    console.log(
+                        "Sala encerrada:",
+                        roomCode
+                    );
+
+
+                    return;
+                }
+
+
+                /*
+                Se não sobrou ninguém por algum
+                motivo, remove a sala.
+                */
+
+                if (
+                    room.participants.size ===
+                    0
+                ) {
+
+                    rooms.delete(
+                        roomCode
+                    );
+
+                    return;
+                }
+
+
+                /*
+                Atualiza os cards dos participantes
+                que continuam na sala.
+                */
+
+                emitRoomState(
                     roomCode
                 );
 
             }
+        );
 
-        }
-    );
-
-});
+    }
+);
 
 
 /*
@@ -513,12 +1109,13 @@ server.listen(
     () => {
 
         console.log("");
+
         console.log(
             "=============================="
         );
 
         console.log(
-            "   KSF SCREEN SERVER V0.3"
+            "   KSF SCREEN SERVER V0.6.0"
         );
 
         console.log(
@@ -530,6 +1127,12 @@ server.listen(
         console.log(
             "Servidor funcionando na porta",
             PORT
+        );
+
+        console.log("");
+
+        console.log(
+            "Multi-Stream: ATIVO"
         );
 
         console.log("");
