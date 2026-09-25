@@ -1000,6 +1000,9 @@ const outgoingPeers =
 const outgoingIce =
     new Map();
 
+const outgoingConnectionIds =
+    new Map();
+
 
 /*
 ================================
@@ -1012,6 +1015,8 @@ let watchingBroadcasterId = null;
 let incomingPeer = null;
 
 let incomingIceCandidates = [];
+
+let incomingConnectionId = null;
 
 
 /*
@@ -1930,6 +1935,10 @@ function closeOutgoingPeer(
         viewerId
     );
 
+    outgoingConnectionIds.delete(
+        viewerId
+    );
+
 }
 
 
@@ -1983,6 +1992,21 @@ async function createOfferForViewer(
     );
 
 
+    const connectionId =
+        selfId + "-" +
+        viewerId + "-" +
+        Date.now() + "-" +
+        Math.random()
+            .toString(36)
+            .slice(2);
+
+
+    outgoingConnectionIds.set(
+        viewerId,
+        connectionId
+    );
+
+
     peer.onicecandidate =
         event => {
 
@@ -1998,6 +2022,8 @@ async function createOfferForViewer(
 
                         type:
                             "ice",
+
+                        connectionId,
 
                         candidate:
                             event.candidate
@@ -2077,6 +2103,8 @@ async function createOfferForViewer(
 
             type:
                 "offer",
+
+            connectionId,
 
             sdp:
                 peer.localDescription
@@ -2191,11 +2219,15 @@ function closeIncomingPeer() {
     incomingIceCandidates =
         [];
 
+    incomingConnectionId =
+        null;
+
 }
 
 
 function createIncomingPeer(
-    broadcasterId
+    broadcasterId,
+    connectionId
 ) {
 
     closeIncomingPeer();
@@ -2209,6 +2241,9 @@ function createIncomingPeer(
 
     incomingPeer =
         peer;
+
+    incomingConnectionId =
+        connectionId;
 
 
     peer.onicecandidate =
@@ -2228,6 +2263,8 @@ function createIncomingPeer(
 
                         type:
                             "ice",
+
+                        connectionId,
 
                         candidate:
                             event.candidate
@@ -2541,9 +2578,21 @@ socket.on(
                 }
 
 
+                if (!data.connectionId) {
+
+                    console.warn(
+                        "Oferta WebRTC sem connectionId:",
+                        data.sourceId
+                    );
+
+                    return;
+                }
+
+
                 const peer =
                     createIncomingPeer(
-                        data.sourceId
+                        data.sourceId,
+                        data.connectionId
                     );
 
 
@@ -2575,6 +2624,9 @@ socket.on(
                         type:
                             "answer",
 
+                        connectionId:
+                            data.connectionId,
+
                         sdp:
                             peer.localDescription
                     }
@@ -2605,6 +2657,28 @@ socket.on(
                 }
 
 
+                const expectedConnectionId =
+                    outgoingConnectionIds.get(
+                        data.sourceId
+                    );
+
+
+                if (
+                    !data.connectionId ||
+                    data.connectionId !==
+                        expectedConnectionId
+                ) {
+
+                    console.log(
+                        "Resposta ignorada de conexão WebRTC antiga:",
+                        data.sourceId,
+                        data.connectionId
+                    );
+
+                    return;
+                }
+
+
                 await peer
                     .setRemoteDescription(
                         data.sdp
@@ -2629,9 +2703,24 @@ socket.on(
                 data.type === "ice"
             ) {
 
+                /*
+                Cada par de participantes pode ter
+                DUAS conexões simultâneas:
+
+                1) eu assistindo a pessoa
+                2) a pessoa assistindo a mim
+
+                sourceId sozinho não diferencia essas
+                duas conexões. connectionId identifica
+                exatamente a qual peer o ICE pertence.
+                */
+
                 if (
+                    data.connectionId &&
+                    data.connectionId ===
+                        incomingConnectionId &&
                     data.sourceId ===
-                    watchingBroadcasterId
+                        watchingBroadcasterId
                 ) {
 
                     if (
@@ -2661,7 +2750,16 @@ socket.on(
                 }
 
 
+                const outgoingConnectionId =
+                    outgoingConnectionIds.get(
+                        data.sourceId
+                    );
+
+
                 if (
+                    data.connectionId &&
+                    data.connectionId ===
+                        outgoingConnectionId &&
                     outgoingPeers.has(
                         data.sourceId
                     )
@@ -2672,7 +2770,15 @@ socket.on(
                         data.candidate
                     );
 
+                    return;
                 }
+
+
+                console.log(
+                    "ICE ignorado: conexão WebRTC não corresponde ao peer ativo.",
+                    data.sourceId,
+                    data.connectionId
+                );
 
             }
 

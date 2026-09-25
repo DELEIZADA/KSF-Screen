@@ -57,7 +57,7 @@ app.get(
         res.send(`
             <h1>KSF Screen Server</h1>
             <p>Servidor Multi-Stream online e funcionando!</p>
-            <p>KSF Screen Server V0.6.0</p>
+            <p>KSF Screen Server V0.6.1 FIX</p>
         `);
 
     }
@@ -305,14 +305,6 @@ io.on(
                 }
 
 
-                /*
-                A numeração começa no Amigo 1.
-
-                Mais para frente, quando existir
-                conta/login, este nome temporário
-                será substituído pelo username.
-                */
-
                 const room = {
 
                     hostId:
@@ -421,11 +413,6 @@ io.on(
                 }
 
 
-                /*
-                Evita que o mesmo socket seja
-                adicionado duas vezes.
-                */
-
                 if (
                     room.participants.has(
                         socket.id
@@ -502,10 +489,6 @@ io.on(
                 );
 
 
-                /*
-                Todos recebem a lista atualizada.
-                */
-
                 emitRoomState(
                     roomCode
                 );
@@ -517,11 +500,6 @@ io.on(
         /*
         ================================
         COMEÇAR TRANSMISSÃO
-
-        Não existe mais bloqueio de broadcaster.
-
-        Cada participante controla somente
-        o próprio estado de transmissão.
         ================================
         */
 
@@ -569,18 +547,10 @@ io.on(
                 );
 
 
-                /*
-                Confirma somente para quem iniciou.
-                */
-
                 socket.emit(
                     "broadcast-started-self"
                 );
 
-
-                /*
-                Atualiza os cards de todos.
-                */
 
                 emitRoomState(
                     roomCode
@@ -647,14 +617,6 @@ io.on(
                 );
 
 
-                /*
-                Quem estiver assistindo esta pessoa
-                precisa fechar somente essa conexão.
-
-                Isso NÃO encerra a sala e NÃO afeta
-                transmissões de outros participantes.
-                */
-
                 socket
                     .to(roomCode)
                     .emit(
@@ -677,15 +639,6 @@ io.on(
         /*
         ================================
         PEDIR PARA ASSISTIR
-
-        O espectador escolheu explicitamente
-        uma transmissão.
-
-        Somente o transmissor escolhido recebe
-        o pedido.
-
-        Nenhum áudio/vídeo é enviado simplesmente
-        por estar dentro da sala.
         ================================
         */
 
@@ -762,11 +715,6 @@ io.on(
                 );
 
 
-                /*
-                Somente o transmissor escolhido
-                recebe o ID de quem quer assistir.
-                */
-
                 io
                     .to(broadcasterId)
                     .emit(
@@ -784,11 +732,6 @@ io.on(
         /*
         ================================
         PARAR DE ASSISTIR
-
-        O espectador continua dentro da sala.
-
-        Apenas a conexão entre ele e o
-        transmissor selecionado é encerrada.
         ================================
         */
 
@@ -860,13 +803,14 @@ io.on(
         ================================
         SINALIZAÇÃO WEBRTC DIRECIONADA
 
-        Antes:
-        signal -> toda a sala
+        V0.6.1:
+        connectionId diferencia duas conexões
+        simultâneas entre os mesmos usuários.
 
-        Agora:
-        signal -> somente targetId
-
-        Isso é fundamental para o Multi-Stream.
+        Exemplo:
+        A transmite para B
+        enquanto
+        B transmite para A.
         ================================
         */
 
@@ -927,10 +871,22 @@ io.on(
 
 
                 /*
-                O servidor acrescenta sourceId.
+                IMPORTANTE:
 
-                Assim quem recebe sabe exatamente
-                de qual participante veio o sinal.
+                Além do sourceId, repassamos
+                connectionId.
+
+                Assim o cliente consegue saber
+                a qual RTCPeerConnection pertencem
+                offer, answer e ICE.
+
+                Isso evita misturar:
+
+                transmissão A -> B
+
+                com
+
+                transmissão B -> A.
                 */
 
                 io
@@ -943,6 +899,9 @@ io.on(
 
                             type:
                                 data.type,
+
+                            connectionId:
+                                data.connectionId,
 
                             sdp:
                                 data.sdp,
@@ -992,10 +951,6 @@ io.on(
                     );
 
 
-                /*
-                Remove o participante da sala.
-                */
-
                 room.participants.delete(
                     socket.id
                 );
@@ -1010,11 +965,6 @@ io.on(
                 );
 
 
-                /*
-                Avisa todos para fecharem qualquer
-                conexão WebRTC relacionada a quem saiu.
-                */
-
                 socket
                     .to(roomCode)
                     .emit(
@@ -1028,12 +978,6 @@ io.on(
 
                 /*
                 HOST SAIU
-
-                Mantemos o comportamento atual:
-                se o criador sair, a sala é encerrada.
-
-                Podemos mudar isso futuramente para
-                transferir a liderança.
                 */
 
                 if (
@@ -1063,11 +1007,6 @@ io.on(
                 }
 
 
-                /*
-                Se não sobrou ninguém por algum
-                motivo, remove a sala.
-                */
-
                 if (
                     room.participants.size ===
                     0
@@ -1080,11 +1019,6 @@ io.on(
                     return;
                 }
 
-
-                /*
-                Atualiza os cards dos participantes
-                que continuam na sala.
-                */
 
                 emitRoomState(
                     roomCode
@@ -1115,7 +1049,7 @@ server.listen(
         );
 
         console.log(
-            "   KSF SCREEN SERVER V0.6.0"
+            "   KSF SCREEN SERVER V0.6.1 FIX"
         );
 
         console.log(
