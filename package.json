@@ -1,6 +1,6 @@
 {
   "name": "ksf-screen",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "KSF Screen - compartilhamento de tela entre amigos",
   "main": "index.js",
   "scripts": {
@@ -33,6 +33,7 @@
       "index.html",
       "index.js",
       "package.json",
+      "icon.ico",
       "node_modules/**/*",
       "native-audio/build/Release/ksf_audio.node"
     ],
@@ -40,6 +41,7 @@
       "native-audio/build/Release/ksf_audio.node"
     ],
     "win": {
+      "icon": "icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -55,6 +57,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "KSF Screen",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
       "artifactName": "KSF-Screen-Setup-${version}.${ext}"
     },
     "publish": [
