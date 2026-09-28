@@ -35,10 +35,12 @@
       "package.json",
       "icon.ico",
       "node_modules/**/*",
-      "native-audio/build/Release/ksf_audio.node"
+      "native-audio/build/Release/ksf_audio.node",
+      "native-audio/build/Release/ksf_video.node"
     ],
     "asarUnpack": [
-      "native-audio/build/Release/ksf_audio.node"
+      "native-audio/build/Release/ksf_audio.node",
+      "native-audio/build/Release/ksf_video.node"
     ],
     "win": {
       "icon": "icon.ico",
