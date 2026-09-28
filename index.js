@@ -46,6 +46,45 @@ catch (error) {
 
 /*
 ================================
+VÍDEO NATIVO KSF SCREEN
+================================
+*/
+
+let nativeVideo = null;
+
+try {
+
+    nativeVideo = require(
+        path.join(
+            __dirname,
+            "native-audio",
+            "build",
+            "Release",
+            "ksf_video.node"
+        )
+    );
+
+    console.log("KSF Video nativo carregado.");
+
+    console.log(
+        "KSF Video WGC suportado:",
+        nativeVideo.isVideoCaptureSupported()
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "KSF Video nativo não pôde ser carregado:",
+        error
+    );
+
+    nativeVideo = null;
+}
+
+
+/*
+================================
 VARIÁVEIS GERAIS
 ================================
 */
@@ -55,6 +94,8 @@ let selectedDisplaySourceType = null;
 let selectedDisplayProcessId = 0;
 
 let mainWindow = null;
+let updateCheckMode = "manual";
+let automaticUpdateCheckTimer = null;
 
 
 /*
@@ -71,6 +112,8 @@ function createWindow() {
         minWidth: 900,
         minHeight: 600,
 
+        frame: false,
+
         backgroundColor: "#111318",
 
         webPreferences: {
@@ -79,19 +122,334 @@ function createWindow() {
         }
     });
 
+
+    /*
+    ================================================
+    KSF SCREEN - COMPATIBILIDADE DE CAPTURA
+
+    O KSF continua 100% opaco.
+
+    No Windows, o addon nativo aplica uma região
+    COMPLEXREGION à própria janela do KSF. Isso evita
+    depender do antigo teste de transparência e mantém
+    o WGC como backend principal.
+    ================================================
+    */
+
+    if (process.platform === "win32") {
+
+        mainWindow.setOpacity(1.0);
+
+    }
+
+
+    let captureCompatibilityTimer = null;
+
+
+    function getMainWindowHandleString() {
+
+        if (
+            !mainWindow ||
+            mainWindow.isDestroyed()
+        ) {
+
+            return null;
+
+        }
+
+
+        try {
+
+            const handleBuffer =
+                mainWindow.getNativeWindowHandle();
+
+
+            if (
+                !Buffer.isBuffer(handleBuffer) ||
+                handleBuffer.length < 4
+            ) {
+
+                return null;
+
+            }
+
+
+            let hwnd = 0n;
+
+
+            for (
+                let index = handleBuffer.length - 1;
+                index >= 0;
+                --index
+            ) {
+
+                hwnd =
+                    (hwnd << 8n) |
+                    BigInt(
+                        handleBuffer[index]
+                    );
+
+            }
+
+
+            if (hwnd <= 0n) {
+
+                return null;
+
+            }
+
+
+            return hwnd.toString();
+
+        }
+        catch (error) {
+
+            console.error(
+                "Erro ao obter HWND do KSF Screen:",
+                error
+            );
+
+            return null;
+
+        }
+
+    }
+
+
+    function applyCaptureCompatibility() {
+
+        if (
+            process.platform !== "win32" ||
+            !nativeVideo ||
+            typeof nativeVideo
+                .enableCaptureCompatibility !==
+                "function" ||
+            !mainWindow ||
+            mainWindow.isDestroyed()
+        ) {
+
+            return;
+
+        }
+
+
+        const hwnd =
+            getMainWindowHandleString();
+
+
+        if (!hwnd) {
+
+            return;
+
+        }
+
+
+        try {
+
+            const result =
+                nativeVideo
+                    .enableCaptureCompatibility(
+                        hwnd
+                    );
+
+
+            console.log(
+                "KSF Capture Compatibility:",
+                result
+            );
+
+        }
+        catch (error) {
+
+            console.error(
+                "Erro ao aplicar KSF Capture Compatibility:",
+                error
+            );
+
+        }
+
+    }
+
+
+    function scheduleCaptureCompatibility() {
+
+        if (captureCompatibilityTimer) {
+
+            clearTimeout(
+                captureCompatibilityTimer
+            );
+
+        }
+
+
+        captureCompatibilityTimer =
+            setTimeout(
+                () => {
+
+                    captureCompatibilityTimer =
+                        null;
+
+                    applyCaptureCompatibility();
+
+                },
+                120
+            );
+
+    }
+
+
     mainWindow.loadFile("index.html");
 
     mainWindow.setMenuBarVisibility(false);
 
+
+    mainWindow.webContents.once(
+        "did-finish-load",
+        () => {
+
+            scheduleCaptureCompatibility();
+
+        }
+    );
+
+
+    mainWindow.on(
+        "resize",
+        () => {
+
+            scheduleCaptureCompatibility();
+
+        }
+    );
+
+
+    mainWindow.on(
+        "maximize",
+        () => {
+
+            scheduleCaptureCompatibility();
+
+        }
+    );
+
+
+    mainWindow.on(
+        "unmaximize",
+        () => {
+
+            scheduleCaptureCompatibility();
+
+        }
+    );
+
+
+    mainWindow.on(
+        "restore",
+        () => {
+
+            scheduleCaptureCompatibility();
+
+        }
+    );
+
+
     mainWindow.on(
         "closed",
         () => {
+
+            if (captureCompatibilityTimer) {
+
+                clearTimeout(
+                    captureCompatibilityTimer
+                );
+
+                captureCompatibilityTimer =
+                    null;
+
+            }
+
 
             mainWindow = null;
 
         }
     );
 }
+
+
+/*
+================================
+CONTROLES DA JANELA
+================================
+*/
+
+ipcMain.handle(
+    "window-minimize",
+    async () => {
+
+        if (
+            mainWindow &&
+            !mainWindow.isDestroyed()
+        ) {
+
+            mainWindow.minimize();
+
+        }
+
+        return true;
+
+    }
+);
+
+
+ipcMain.handle(
+    "window-toggle-maximize",
+    async () => {
+
+        if (
+            !mainWindow ||
+            mainWindow.isDestroyed()
+        ) {
+
+            return false;
+
+        }
+
+
+        if (mainWindow.isMaximized()) {
+
+            mainWindow.unmaximize();
+
+        }
+        else {
+
+            mainWindow.maximize();
+
+        }
+
+
+        return mainWindow.isMaximized();
+
+    }
+);
+
+
+ipcMain.handle(
+    "window-close",
+    async () => {
+
+        if (
+            mainWindow &&
+            !mainWindow.isDestroyed()
+        ) {
+
+            mainWindow.close();
+
+        }
+
+        return true;
+
+    }
+);
 
 
 /*
@@ -118,6 +476,8 @@ function sendUpdateStatus(
         "update-status",
         {
             status,
+            automatic:
+                updateCheckMode === "automatic",
             ...data
         }
     );
@@ -271,6 +631,8 @@ ipcMain.handle(
 
         try {
 
+            updateCheckMode = "manual";
+
             await autoUpdater
                 .checkForUpdates();
 
@@ -298,6 +660,69 @@ ipcMain.handle(
 
     }
 );
+
+
+/*
+================================
+VERIFICAÇÃO AUTOMÁTICA AO INICIAR
+================================
+*/
+
+function checkForUpdatesAutomatically() {
+
+    if (!app.isPackaged) {
+
+        console.log(
+            "Verificação automática ignorada em desenvolvimento."
+        );
+
+        return;
+
+    }
+
+
+    if (automaticUpdateCheckTimer) {
+
+        clearTimeout(
+            automaticUpdateCheckTimer
+        );
+
+    }
+
+
+    automaticUpdateCheckTimer =
+        setTimeout(
+            async () => {
+
+                automaticUpdateCheckTimer =
+                    null;
+
+                try {
+
+                    updateCheckMode =
+                        "automatic";
+
+                    console.log(
+                        "Verificando atualizações automaticamente..."
+                    );
+
+                    await autoUpdater
+                        .checkForUpdates();
+
+                }
+                catch (error) {
+
+                    console.error(
+                        "Erro na verificação automática de atualização:",
+                        error
+                    );
+
+                }
+
+            },
+            2500
+        );
+}
 
 
 /*
@@ -476,17 +901,6 @@ function getWindowHandleFromSourceId(
     }
 
 
-    /*
-    O addon nativo espera o HWND
-    como STRING.
-
-    Exemplo:
-
-    window:132138:0
-
-    HWND = "132138"
-    */
-
     const hwnd =
         parts[1];
 
@@ -540,18 +954,6 @@ function getProcessIdFromSourceId(
 
 
     try {
-
-        /*
-        Nosso addon retorna:
-
-        {
-            pid: 9128,
-            hwnd: "132138"
-        }
-
-        Portanto precisamos guardar
-        somente result.pid.
-        */
 
         const result =
             nativeAudio
@@ -905,6 +1307,313 @@ ipcMain.handle(
 
 /*
 ================================
+VÍDEO NATIVO - SUPORTE
+================================
+*/
+
+ipcMain.handle(
+    "is-native-video-supported",
+    async () => {
+
+        if (!nativeVideo) {
+
+            return false;
+
+        }
+
+
+        try {
+
+            return Boolean(
+                nativeVideo
+                    .isVideoCaptureSupported()
+            );
+
+        }
+        catch (error) {
+
+            console.error(
+                "Erro ao consultar suporte do KSF Video:",
+                error
+            );
+
+            return false;
+
+        }
+
+    }
+);
+
+
+/*
+================================
+VÍDEO NATIVO - INICIAR
+================================
+*/
+
+ipcMain.handle(
+    "start-native-window-video",
+    async () => {
+
+        if (!nativeVideo) {
+
+            return {
+                success: false,
+                reason:
+                    "native-video-unavailable"
+            };
+
+        }
+
+
+        if (
+            selectedDisplaySourceType !==
+            "window"
+        ) {
+
+            return {
+                success: false,
+                reason:
+                    "not-window"
+            };
+
+        }
+
+
+        const hwnd =
+            getWindowHandleFromSourceId(
+                selectedDisplaySourceId
+            );
+
+
+        if (!hwnd) {
+
+            return {
+                success: false,
+                reason:
+                    "invalid-hwnd"
+            };
+
+        }
+
+
+        try {
+
+            console.log(
+                "Iniciando KSF Video para HWND:",
+                hwnd
+            );
+
+
+            const result =
+                nativeVideo
+                    .startWindowCapture(
+                        hwnd
+                    );
+
+
+            console.log(
+                "KSF Video iniciado:",
+                result
+            );
+
+
+            return {
+                ...result,
+
+                sourceType:
+                    "window",
+
+                hwnd:
+                    hwnd
+            };
+
+        }
+        catch (error) {
+
+            console.error(
+                "Erro ao iniciar KSF Video:",
+                error
+            );
+
+
+            return {
+                success: false,
+                reason:
+                    "capture-error",
+                error:
+                    error.message
+            };
+
+        }
+
+    }
+);
+
+
+/*
+================================
+VÍDEO NATIVO - LER FRAME
+================================
+*/
+
+ipcMain.handle(
+    "read-native-window-video",
+    async () => {
+
+        if (!nativeVideo) {
+
+            return {
+                active: false,
+                hasFrame: false,
+                width: 0,
+                height: 0,
+                frameNumber: 0,
+                data:
+                    Buffer.alloc(0)
+            };
+
+        }
+
+
+        try {
+
+            return nativeVideo
+                .readVideoFrame();
+
+        }
+        catch (error) {
+
+            console.error(
+                "Erro ao ler frame do KSF Video:",
+                error
+            );
+
+
+            return {
+                active: false,
+                hasFrame: false,
+                width: 0,
+                height: 0,
+                frameNumber: 0,
+                data:
+                    Buffer.alloc(0),
+                error:
+                    error.message
+            };
+
+        }
+
+    }
+);
+
+
+/*
+================================
+VÍDEO NATIVO - PARAR
+================================
+*/
+
+ipcMain.handle(
+    "stop-native-window-video",
+    async () => {
+
+        if (!nativeVideo) {
+
+            return {
+                success: true,
+                active: false
+            };
+
+        }
+
+
+        try {
+
+            const result =
+                nativeVideo
+                    .stopWindowCapture();
+
+
+            console.log(
+                "KSF Video parado:",
+                result
+            );
+
+
+            return result;
+
+        }
+        catch (error) {
+
+            console.error(
+                "Erro ao parar KSF Video:",
+                error
+            );
+
+
+            return {
+                success: false,
+                error:
+                    error.message
+            };
+
+        }
+
+    }
+);
+
+
+/*
+================================
+VÍDEO NATIVO - STATUS
+================================
+*/
+
+ipcMain.handle(
+    "get-native-video-status",
+    async () => {
+
+        if (!nativeVideo) {
+
+            return {
+                available: false,
+                active: false
+            };
+
+        }
+
+
+        try {
+
+            const status =
+                nativeVideo
+                    .getVideoCaptureStatus();
+
+
+            return {
+                available: true,
+                ...status
+            };
+
+        }
+        catch (error) {
+
+            return {
+                available: true,
+                active: false,
+                error:
+                    error.message
+            };
+
+        }
+
+    }
+);
+
+
+/*
+================================
 LISTAR TELAS E JANELAS
 ================================
 */
@@ -931,55 +1640,250 @@ ipcMain.handle(
                 });
 
 
-        return sources.map(
-            source => {
+        const result =
+            sources.map(
+                source => {
 
-                const sourceType =
-                    source.id.startsWith(
-                        "window:"
-                    )
-                        ? "window"
-                        : "screen";
-
-
-                let processId = 0;
+                    const sourceType =
+                        source.id.startsWith(
+                            "window:"
+                        )
+                            ? "window"
+                            : "screen";
 
 
-                if (
-                    sourceType ===
-                    "window"
+                    let processId = 0;
+
+
+                    if (
+                        sourceType ===
+                        "window"
+                    ) {
+
+                        processId =
+                            getProcessIdFromSourceId(
+                                source.id
+                            );
+
+                    }
+
+
+                    return {
+
+                        id:
+                            source.id,
+
+                        name:
+                            source.name,
+
+                        type:
+                            sourceType,
+
+                        processId:
+                            processId,
+
+                        minimized:
+                            false,
+
+                        nativeOnly:
+                            false,
+
+                        thumbnail:
+                            source.thumbnail
+                                .toDataURL()
+
+                    };
+
+                }
+            );
+
+
+        /*
+        ================================================
+        COMPLEMENTO NATIVO DE JANELAS
+
+        O desktopCapturer do Electron pode deixar de
+        mostrar algumas janelas, principalmente quando
+        estão minimizadas.
+
+        O addon KSF Video enumera as janelas diretamente
+        pelo Windows e acrescenta aqui as que estiverem
+        faltando.
+
+        Para manter compatibilidade com o restante do
+        KSF Screen, a ID continua no formato:
+
+        window:HWND:0
+        ================================================
+        */
+
+        if (
+            nativeVideo &&
+            typeof nativeVideo
+                .listCapturableWindows ===
+                "function"
+        ) {
+
+            try {
+
+                const nativeWindows =
+                    nativeVideo
+                        .listCapturableWindows();
+
+
+                const knownWindowHandles =
+                    new Set(
+                        result
+                            .filter(
+                                item =>
+                                    item.type ===
+                                    "window"
+                            )
+                            .map(
+                                item =>
+                                    getWindowHandleFromSourceId(
+                                        item.id
+                                    )
+                            )
+                            .filter(Boolean)
+                    );
+
+
+                for (
+                    const nativeWindow
+                    of nativeWindows
                 ) {
 
-                    processId =
-                        getProcessIdFromSourceId(
-                            source.id
+                    if (
+                        !nativeWindow ||
+                        typeof nativeWindow !==
+                            "object"
+                    ) {
+
+                        continue;
+
+                    }
+
+
+                    const hwnd =
+                        String(
+                            nativeWindow.hwnd ||
+                            ""
                         );
+
+
+                    const title =
+                        String(
+                            nativeWindow.title ||
+                            ""
+                        ).trim();
+
+
+                    if (
+                        !hwnd ||
+                        hwnd === "0" ||
+                        !/^\d+$/.test(hwnd) ||
+                        !title
+                    ) {
+
+                        continue;
+
+                    }
+
+
+                    if (
+                        knownWindowHandles
+                            .has(hwnd)
+                    ) {
+
+                        const existing =
+                            result.find(
+                                item =>
+                                    item.type ===
+                                        "window" &&
+                                    getWindowHandleFromSourceId(
+                                        item.id
+                                    ) === hwnd
+                            );
+
+
+                        if (existing) {
+
+                            existing.minimized =
+                                Boolean(
+                                    nativeWindow
+                                        .minimized
+                                );
+
+                        }
+
+
+                        continue;
+
+                    }
+
+
+                    const processId =
+                        Number(
+                            nativeWindow
+                                .processId
+                        );
+
+
+                    result.push({
+
+                        id:
+                            `window:${hwnd}:0`,
+
+                        name:
+                            title,
+
+                        type:
+                            "window",
+
+                        processId:
+                            Number.isFinite(
+                                processId
+                            )
+                                ? Math.floor(
+                                    processId
+                                )
+                                : 0,
+
+                        minimized:
+                            Boolean(
+                                nativeWindow
+                                    .minimized
+                            ),
+
+                        nativeOnly:
+                            true,
+
+                        thumbnail:
+                            null
+
+                    });
+
+
+                    knownWindowHandles
+                        .add(hwnd);
 
                 }
 
+            }
+            catch (error) {
 
-                return {
-
-                    id:
-                        source.id,
-
-                    name:
-                        source.name,
-
-                    type:
-                        sourceType,
-
-                    processId:
-                        processId,
-
-                    thumbnail:
-                        source.thumbnail
-                            .toDataURL()
-
-                };
+                console.error(
+                    "Erro ao listar janelas pelo KSF Video:",
+                    error
+                );
 
             }
-        );
+
+        }
+
+
+        return result;
 
     }
 );
@@ -997,10 +1901,6 @@ ipcMain.handle(
         event,
         sourceId
     ) => {
-
-        /*
-        Limpa seleção
-        */
 
         if (
             typeof sourceId !== "string" ||
@@ -1024,17 +1924,9 @@ ipcMain.handle(
         }
 
 
-        /*
-        Guarda a source ID
-        */
-
         selectedDisplaySourceId =
             sourceId;
 
-
-        /*
-        JANELA
-        */
 
         if (
             sourceId.startsWith(
@@ -1052,10 +1944,6 @@ ipcMain.handle(
                 );
 
         }
-
-        /*
-        TELA INTEIRA
-        */
 
         else {
 
@@ -1179,26 +2067,9 @@ function configureDisplayMedia() {
                     };
 
 
-                    /*
-                    POR ENQUANTO:
-
-                    Mantemos o loopback geral
-                    para não quebrar a transmissão
-                    atual.
-
-                    Na próxima etapa no index.html:
-
-                    TELA INTEIRA
-                    -> usa este loopback
-
-                    JANELA
-                    -> remove este áudio do stream
-                       e usa o PCM isolado.
-                    */
-
                     if (
                         process.platform ===
-                        "win32" &&
+                            "win32" &&
                         request.audioRequested
                     ) {
 
@@ -1239,6 +2110,17 @@ app.on(
     "before-quit",
     () => {
 
+        if (automaticUpdateCheckTimer) {
+
+            clearTimeout(
+                automaticUpdateCheckTimer
+            );
+
+            automaticUpdateCheckTimer =
+                null;
+
+        }
+
         stopNativeAudioCapture();
 
     }
@@ -1259,6 +2141,8 @@ app.whenReady().then(
         configureAutoUpdater();
 
         createWindow();
+
+        checkForUpdatesAutomatically();
 
     }
 );

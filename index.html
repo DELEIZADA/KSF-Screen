@@ -54,12 +54,70 @@ button:disabled {
 
 /*
 ================================
+BARRA DA JANELA
+================================
+*/
+
+.window-titlebar {
+    height: 36px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    background: #111318;
+    border-bottom: 1px solid #242933;
+    user-select: none;
+    -webkit-app-region: drag;
+}
+
+.window-title {
+    padding-left: 13px;
+    color: #cfd3dc;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.window-controls {
+    height: 100%;
+    margin-left: auto;
+    display: flex;
+    align-items: stretch;
+    -webkit-app-region: no-drag;
+}
+
+.window-control-button {
+    width: 46px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #d7dbe3;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    font-weight: normal;
+    line-height: 36px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.window-control-button:hover {
+    background: #2b303b;
+}
+
+.window-control-button.close:hover {
+    background: #c42b1c;
+    color: white;
+}
+
+
+/*
+================================
 HOME
 ================================
 */
 
 #home {
-    min-height: 100vh;
+    min-height: calc(100vh - 36px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -105,7 +163,7 @@ SALA
 
 #room {
     display: none;
-    height: 100vh;
+    height: calc(100vh - 36px);
     flex-direction: column;
 }
 
@@ -306,6 +364,41 @@ CONTEÚDO DA SALA
 
 #stopWatchingButton {
     display: none;
+}
+
+.viewer-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#volumeControl {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    background: #181b22;
+    border: 1px solid #303642;
+}
+
+#volumeButton {
+    min-width: 38px;
+    padding: 7px 9px;
+    font-size: 15px;
+}
+
+#volumeSlider {
+    width: 115px;
+    accent-color: #5865f2;
+    cursor: pointer;
+}
+
+#volumeValue {
+    min-width: 38px;
+    color: #aab0bb;
+    font-size: 12px;
+    text-align: right;
 }
 
 .video-area {
@@ -527,6 +620,22 @@ ATUALIZAÇÕES
     display: none;
 }
 
+#updatePanel.update-available {
+    border-color: #5865f2;
+    box-shadow:
+        0 0 0 2px rgba(88, 101, 242, .22),
+        0 14px 40px rgba(0, 0, 0, .35);
+}
+
+#updatePanel.update-available .update-title {
+    color: #aeb5ff;
+}
+
+#updatePanel.update-available #updateMessage {
+    color: white;
+    font-weight: bold;
+}
+
 
 @media (max-width: 900px) {
     .room-content {
@@ -541,6 +650,46 @@ ATUALIZAÇÕES
 </head>
 
 <body>
+
+
+<!--
+================================
+BARRA DA JANELA
+================================
+-->
+
+<div class="window-titlebar">
+
+    <div class="window-title">
+        KSF Screen
+    </div>
+
+    <div class="window-controls">
+
+        <button
+            id="windowMinimizeButton"
+            class="window-control-button"
+            title="Minimizar">
+            &#8212;
+        </button>
+
+        <button
+            id="windowMaximizeButton"
+            class="window-control-button"
+            title="Maximizar">
+            &#9633;
+        </button>
+
+        <button
+            id="windowCloseButton"
+            class="window-control-button close"
+            title="Fechar">
+            &#10005;
+        </button>
+
+    </div>
+
+</div>
 
 
 <!--
@@ -646,6 +795,12 @@ SALA
                 Parar transmissão
             </button>
 
+            <button
+                id="leaveRoomButton"
+                class="secondary">
+                Sair da sala
+            </button>
+
         </div>
 
     </div>
@@ -677,11 +832,37 @@ SALA
                     Nenhuma transmissão selecionada
                 </span>
 
-                <button
-                    id="stopWatchingButton"
-                    class="secondary">
-                    Parar de assistir
-                </button>
+                <div class="viewer-controls">
+
+                    <div id="volumeControl">
+
+                        <button
+                            id="volumeButton"
+                            class="secondary"
+                            title="Ativar ou desativar o som">
+                            🔊
+                        </button>
+
+                        <input
+                            id="volumeSlider"
+                            type="range"
+                            min="0"
+                            max="100"
+                            value="100">
+
+                        <span id="volumeValue">
+                            100%
+                        </span>
+
+                    </div>
+
+                    <button
+                        id="stopWatchingButton"
+                        class="secondary">
+                        Parar de assistir
+                    </button>
+
+                </div>
 
             </div>
 
@@ -859,6 +1040,22 @@ ELEMENTOS
 ================================
 */
 
+const windowMinimizeButton =
+    document.getElementById(
+        "windowMinimizeButton"
+    );
+
+const windowMaximizeButton =
+    document.getElementById(
+        "windowMaximizeButton"
+    );
+
+const windowCloseButton =
+    document.getElementById(
+        "windowCloseButton"
+    );
+
+
 const home =
     document.getElementById("home");
 
@@ -886,6 +1083,9 @@ const shareButton =
 const stopButton =
     document.getElementById("stopButton");
 
+const leaveRoomButton =
+    document.getElementById("leaveRoomButton");
+
 const streamQualityBadge =
     document.getElementById("streamQualityBadge");
 
@@ -906,6 +1106,18 @@ const watchingText =
 
 const stopWatchingButton =
     document.getElementById("stopWatchingButton");
+
+const volumeControl =
+    document.getElementById("volumeControl");
+
+const volumeButton =
+    document.getElementById("volumeButton");
+
+const volumeSlider =
+    document.getElementById("volumeSlider");
+
+const volumeValue =
+    document.getElementById("volumeValue");
 
 const video =
     document.getElementById("video");
@@ -951,6 +1163,53 @@ const downloadUpdateButton =
 
 const installUpdateButton =
     document.getElementById("installUpdateButton");
+
+
+/*
+================================
+CONTROLES DA JANELA
+================================
+*/
+
+windowMinimizeButton.onclick =
+    () => {
+
+        ipcRenderer.invoke(
+            "window-minimize"
+        );
+
+    };
+
+
+windowMaximizeButton.onclick =
+    async () => {
+
+        const maximized =
+            await ipcRenderer.invoke(
+                "window-toggle-maximize"
+            );
+
+        windowMaximizeButton.innerHTML =
+            maximized
+                ? "&#10064;"
+                : "&#9633;";
+
+        windowMaximizeButton.title =
+            maximized
+                ? "Restaurar"
+                : "Maximizar";
+
+    };
+
+
+windowCloseButton.onclick =
+    () => {
+
+        ipcRenderer.invoke(
+            "window-close"
+        );
+
+    };
 
 
 /*
@@ -1018,6 +1277,12 @@ let incomingIceCandidates = [];
 
 let incomingConnectionId = null;
 
+let watchingSelfPreview = false;
+
+let viewerVolume = 1;
+
+let viewerMuted = false;
+
 
 /*
 ================================
@@ -1036,6 +1301,147 @@ let activeAudioMode = "none";
 
 /*
 ================================
+AVISO DE ATUALIZAÇÃO
+================================
+*/
+
+const notifiedUpdateVersions =
+    new Set();
+
+
+function playUpdateNotificationSound() {
+
+    try {
+
+        const AudioContextClass =
+            window.AudioContext ||
+            window.webkitAudioContext;
+
+
+        if (!AudioContextClass) {
+            return;
+        }
+
+
+        const audioContext =
+            new AudioContextClass();
+
+
+        const oscillator =
+            audioContext.createOscillator();
+
+        const gain =
+            audioContext.createGain();
+
+
+        oscillator.type =
+            "sine";
+
+        oscillator.frequency.setValueAtTime(
+            880,
+            audioContext.currentTime
+        );
+
+        oscillator.frequency.exponentialRampToValueAtTime(
+            1174.66,
+            audioContext.currentTime + 0.12
+        );
+
+
+        gain.gain.setValueAtTime(
+            0.0001,
+            audioContext.currentTime
+        );
+
+        gain.gain.exponentialRampToValueAtTime(
+            0.12,
+            audioContext.currentTime + 0.015
+        );
+
+        gain.gain.exponentialRampToValueAtTime(
+            0.0001,
+            audioContext.currentTime + 0.22
+        );
+
+
+        oscillator.connect(
+            gain
+        );
+
+        gain.connect(
+            audioContext.destination
+        );
+
+
+        oscillator.start();
+
+        oscillator.stop(
+            audioContext.currentTime + 0.23
+        );
+
+
+        oscillator.onended =
+            () => {
+
+                audioContext.close()
+                    .catch(
+                        () => {}
+                    );
+
+            };
+
+    }
+
+    catch (error) {
+
+        console.warn(
+            "Não foi possível tocar o aviso de atualização:",
+            error
+        );
+
+    }
+
+}
+
+
+function highlightAvailableUpdate(
+    version
+) {
+
+    updatePanel.classList.add(
+        "update-available"
+    );
+
+
+    const versionKey =
+        String(
+            version ||
+            "nova-versao"
+        );
+
+
+    if (
+        notifiedUpdateVersions.has(
+            versionKey
+        )
+    ) {
+
+        return;
+    }
+
+
+    notifiedUpdateVersions.add(
+        versionKey
+    );
+
+
+    playUpdateNotificationSound();
+
+}
+
+
+/*
+================================
 ÁUDIO NATIVO
 ================================
 */
@@ -1049,6 +1455,54 @@ let nativeAudioPollTimer = null;
 let nativeAudioReadBusy = false;
 
 let nativeAudioNextTime = 0;
+
+
+/*
+================================
+VÍDEO NATIVO - KSF CAPTURE ENGINE
+================================
+*/
+
+let nativeVideo = null;
+
+try {
+
+    const path =
+        require("path");
+
+    nativeVideo = require(
+        path.join(
+            __dirname,
+            "native-audio",
+            "build",
+            "Release",
+            "ksf_video.node"
+        )
+    );
+
+    console.log(
+        "KSF Video disponível no renderer:",
+        nativeVideo.isVideoCaptureSupported()
+    );
+
+}
+catch (error) {
+
+    console.error(
+        "KSF Video não pôde ser carregado no renderer:",
+        error
+    );
+
+    nativeVideo = null;
+}
+
+let nativeVideoCanvas = null;
+let nativeVideoContext = null;
+let nativeVideoStream = null;
+let nativeVideoPollTimer = null;
+let nativeVideoLastFrameNumber = -1;
+let nativeVideoTimestamp = 0;
+let nativeVideoLastBackend = null;
 
 
 /*
@@ -1232,6 +1686,113 @@ function showRoom(
 
 /*
 ================================
+SAIR / VOLTAR AO MENU
+================================
+*/
+
+function resetRoomAndReturnHome() {
+
+    stopWatching(
+        false
+    );
+
+    stopLocalTransmission(
+        false
+    );
+
+    closeAllOutgoingPeers();
+
+    closeIncomingPeer();
+
+    participants =
+        [];
+
+    currentRoom =
+        null;
+
+    selfId =
+        null;
+
+    watchingBroadcasterId =
+        null;
+
+    watchingSelfPreview =
+        false;
+
+    incomingIceCandidates =
+        [];
+
+    incomingConnectionId =
+        null;
+
+    selectedSourceId =
+        null;
+
+    sourceModal.style.display =
+        "none";
+
+    roomCode.textContent =
+        "------";
+
+    status.textContent =
+        "Conectando...";
+
+    participantsContainer.innerHTML =
+        "";
+
+    video.pause();
+
+    video.srcObject =
+        null;
+
+    video.muted =
+        false;
+
+    video.volume =
+        viewerVolume;
+
+    video.style.display =
+        "none";
+
+    emptyMessage.style.display =
+        "block";
+
+    emptyMessage.textContent =
+        "Escolha uma pessoa que esteja transmitindo para assistir.";
+
+    watchingText.textContent =
+        "Nenhuma transmissão selecionada";
+
+    stopWatchingButton.style.display =
+        "none";
+
+    volumeControl.style.display =
+        "none";
+
+    streamQualityBadge
+        .classList
+        .remove("active");
+
+    audioBadge
+        .classList
+        .remove("active");
+
+    updateShareButtons();
+
+    room.style.display =
+        "none";
+
+    home.style.display =
+        "flex";
+
+    updatePanel.style.display =
+        "block";
+
+}
+
+
+/*
+================================
 BOTÕES DE TRANSMISSÃO
 ================================
 */
@@ -1388,8 +1949,8 @@ function renderParticipants() {
 
 
         if (
-            participant.id ===
-            watchingBroadcasterId
+            participant.id === watchingBroadcasterId ||
+            (participant.id === selfId && watchingSelfPreview)
         ) {
 
             card.classList.add(
@@ -1515,16 +2076,13 @@ function renderParticipants() {
 
 
         /*
-        Só mostramos ASSISTIR em outra pessoa.
+        Toda pessoa transmitindo pode ser assistida.
 
-        Sua própria transmissão não precisa
-        voltar pela internet para você.
+        Para a própria transmissão usamos somente
+        a prévia local, sem criar WebRTC com nós mesmos.
         */
 
-        if (
-            participant.broadcasting &&
-            participant.id !== selfId
-        ) {
+        if (participant.broadcasting) {
 
             const watchButton =
                 document.createElement(
@@ -1535,10 +2093,13 @@ function renderParticipants() {
                 "primary watch-button";
 
 
-            if (
-                watchingBroadcasterId ===
-                participant.id
-            ) {
+            const isWatchingThisParticipant =
+                participant.id === selfId
+                    ? watchingSelfPreview
+                    : watchingBroadcasterId === participant.id;
+
+
+            if (isWatchingThisParticipant) {
 
                 watchButton.textContent =
                     "Assistindo";
@@ -1551,14 +2112,21 @@ function renderParticipants() {
             else {
 
                 watchButton.textContent =
-                    "Assistir";
+                    participant.id === selfId
+                        ? "Visualizar minha transmissão"
+                        : "Assistir";
 
                 watchButton.onclick =
                     () => {
 
-                        watchStream(
-                            participant.id
-                        );
+                        if (participant.id === selfId) {
+                            watchSelfStream();
+                        }
+                        else {
+                            watchStream(
+                                participant.id
+                            );
+                        }
 
                     };
 
@@ -1641,6 +2209,37 @@ joinButton.onclick =
             "join-room",
             code
         );
+
+    };
+
+
+/*
+================================
+BOTÃO SAIR DA SALA
+================================
+*/
+
+leaveRoomButton.onclick =
+    () => {
+
+        if (!currentRoom) {
+
+            resetRoomAndReturnHome();
+            return;
+
+        }
+
+        leaveRoomButton.disabled =
+            true;
+
+        socket.emit(
+            "leave-room"
+        );
+
+        resetRoomAndReturnHome();
+
+        leaveRoomButton.disabled =
+            false;
 
     };
 
@@ -1756,14 +2355,17 @@ socket.on(
             message
         );
 
-        room.style.display =
-            "none";
+        resetRoomAndReturnHome();
 
-        home.style.display =
-            "flex";
+    }
+);
 
-        updatePanel.style.display =
-            "block";
+
+socket.on(
+    "room-left",
+    () => {
+
+        resetRoomAndReturnHome();
 
     }
 );
@@ -1773,26 +2375,11 @@ socket.on(
     "host-left",
     () => {
 
-        stopWatching(
-            false
+        resetRoomAndReturnHome();
+
+        alert(
+            "O dono saiu da sala. A sala foi encerrada."
         );
-
-        stopLocalTransmission(
-            false
-        );
-
-        closeAllOutgoingPeers();
-
-        participants =
-            [];
-
-        renderParticipants();
-
-        status.textContent =
-            "O dono saiu da sala.";
-
-        emptyMessage.textContent =
-            "A sala foi encerrada.";
 
     }
 );
@@ -2294,11 +2881,7 @@ function createIncomingPeer(
             video.srcObject =
                 remoteStream;
 
-            video.muted =
-                false;
-
-            video.volume =
-                1;
+            applyViewerVolume();
 
             video.style.display =
                 "block";
@@ -2799,6 +3382,199 @@ socket.on(
 
 /*
 ================================
+PRÉVIA DA PRÓPRIA TRANSMISSÃO
+================================
+*/
+
+function updateVolumeUI() {
+
+    const percent =
+        Math.round(
+            viewerVolume * 100
+        );
+
+    volumeSlider.value =
+        String(percent);
+
+    volumeValue.textContent =
+        percent + "%";
+
+    volumeButton.textContent =
+        viewerMuted || percent === 0
+            ? "🔇"
+            : percent < 50
+                ? "🔉"
+                : "🔊";
+
+}
+
+
+function applyViewerVolume() {
+
+    if (watchingSelfPreview) {
+
+        video.muted =
+            true;
+
+        video.volume =
+            0;
+
+        return;
+    }
+
+
+    video.volume =
+        viewerVolume;
+
+    video.muted =
+        viewerMuted ||
+        viewerVolume === 0;
+
+}
+
+
+volumeSlider.oninput =
+    () => {
+
+        viewerVolume =
+            Math.max(
+                0,
+                Math.min(
+                    1,
+                    Number(
+                        volumeSlider.value
+                    ) / 100
+                )
+            );
+
+        viewerMuted =
+            viewerVolume === 0;
+
+        applyViewerVolume();
+
+        updateVolumeUI();
+
+    };
+
+
+volumeButton.onclick =
+    () => {
+
+        if (viewerVolume === 0) {
+
+            viewerVolume =
+                1;
+
+            viewerMuted =
+                false;
+
+        }
+
+        else {
+
+            viewerMuted =
+                !viewerMuted;
+
+        }
+
+        applyViewerVolume();
+
+        updateVolumeUI();
+
+    };
+
+
+function watchSelfStream() {
+
+    if (
+        !isBroadcasting ||
+        !localStream
+    ) {
+        return;
+    }
+
+
+    /*
+    Se estávamos assistindo outra pessoa,
+    encerramos somente aquela visualização remota.
+    */
+
+    if (watchingBroadcasterId) {
+
+        socket.emit(
+            "stop-watching",
+            {
+                broadcasterId:
+                    watchingBroadcasterId
+            }
+        );
+
+    }
+
+
+    watchingBroadcasterId =
+        null;
+
+    closeIncomingPeer();
+
+
+    watchingSelfPreview =
+        true;
+
+
+    video.pause();
+
+    video.srcObject =
+        localStream;
+
+    /*
+    A prévia local fica SEMPRE muda.
+    Isso não altera o áudio enviado aos amigos.
+    */
+
+    video.muted =
+        true;
+
+    video.volume =
+        0;
+
+    video.style.display =
+        "block";
+
+
+    emptyMessage.style.display =
+        "none";
+
+    watchingText.textContent =
+        "Visualizando sua transmissão • prévia sem áudio";
+
+    stopWatchingButton.style.display =
+        "inline-block";
+
+    volumeControl.style.display =
+        "none";
+
+
+    video.play()
+        .catch(
+            error => {
+
+                console.log(
+                    "Prévia local aguardando reprodução:",
+                    error
+                );
+
+            }
+        );
+
+
+    renderParticipants();
+
+}
+
+
+/*
+================================
 ASSISTIR TRANSMISSÃO
 ================================
 */
@@ -2807,12 +3583,19 @@ function watchStream(
     broadcasterId
 ) {
 
-    if (
-        !broadcasterId ||
-        broadcasterId === selfId
-    ) {
+    if (!broadcasterId) {
         return;
     }
+
+
+    if (broadcasterId === selfId) {
+        watchSelfStream();
+        return;
+    }
+
+
+    watchingSelfPreview =
+        false;
 
 
     /*
@@ -2878,6 +3661,11 @@ function watchStream(
     stopWatchingButton.style.display =
         "inline-block";
 
+    volumeControl.style.display =
+        "flex";
+
+    updateVolumeUI();
+
 
     renderParticipants();
 
@@ -2909,6 +3697,9 @@ function stopWatching(
     const previousBroadcasterId =
         watchingBroadcasterId;
 
+    const wasWatchingSelf =
+        watchingSelfPreview;
+
 
     if (
         notifyBroadcaster &&
@@ -2929,6 +3720,9 @@ function stopWatching(
     watchingBroadcasterId =
         null;
 
+    watchingSelfPreview =
+        false;
+
 
     closeIncomingPeer();
 
@@ -2937,6 +3731,12 @@ function stopWatching(
 
     video.srcObject =
         null;
+
+    video.muted =
+        false;
+
+    video.volume =
+        viewerVolume;
 
     video.style.display =
         "none";
@@ -2954,6 +3754,9 @@ function stopWatching(
 
 
     stopWatchingButton.style.display =
+        "none";
+
+    volumeControl.style.display =
         "none";
 
 
@@ -3097,15 +3900,75 @@ ESCOLHER TELA / JANELA
 ================================
 */
 
+function isUsefulShareSource(source) {
+
+    if (!source || !source.name) {
+        return false;
+    }
+
+    if (source.type === "screen") {
+        return true;
+    }
+
+    const name = String(source.name).trim();
+    const lower = name.toLocaleLowerCase("pt-BR");
+
+    if (!name) {
+        return false;
+    }
+
+    const blockedExact = new Set([
+        "program manager",
+        "default ime",
+        "msctfime ui",
+        "nova notificação",
+        "new notification",
+        "pesquisar",
+        "search",
+        "iniciar",
+        "start"
+    ]);
+
+    if (blockedExact.has(lower)) {
+        return false;
+    }
+
+    const blockedParts = [
+        "experiência de entrada do windows",
+        "windows input experience",
+        "host de experiência do shell",
+        "shell experience host",
+        "host de experiência do windows",
+        "windows experience host",
+        "textinputhost",
+        "applicationframehost"
+    ];
+
+    if (blockedParts.some(part => lower.includes(part))) {
+        return false;
+    }
+
+    return true;
+}
+
+
 shareButton.onclick =
     async () => {
 
         try {
 
-            const availableSources =
+            const rawSources =
                 await ipcRenderer.invoke(
                     "get-screen-sources"
                 );
+
+
+            const availableSources =
+                Array.isArray(rawSources)
+                    ? rawSources.filter(
+                        isUsefulShareSource
+                    )
+                    : [];
 
 
             sourcesContainer.innerHTML =
@@ -3131,8 +3994,38 @@ shareButton.onclick =
                         "img"
                     );
 
-                image.src =
-                    source.thumbnail;
+                if (source.thumbnail) {
+
+                    image.src =
+                        source.thumbnail;
+
+                }
+                else {
+
+                    const placeholderText =
+                        source.minimized
+                            ? "JANELA MINIMIZADA"
+                            : "JANELA DISPONÍVEL";
+
+                    const placeholderSvg =
+                        `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180"><rect width="320" height="180" rx="10" fill="#101217"/><rect x="83" y="43" width="154" height="86" rx="7" fill="none" stroke="#596173" stroke-width="4"/><path d="M132 145h56M160 129v16" stroke="#596173" stroke-width="4" stroke-linecap="round"/><text x="160" y="166" text-anchor="middle" fill="#aeb6c7" font-family="Arial, sans-serif" font-size="12">${placeholderText}</text></svg>`;
+
+                    image.src =
+                        "data:image/svg+xml;charset=UTF-8," +
+                        encodeURIComponent(
+                            placeholderSvg
+                        );
+
+                    image.alt =
+                        placeholderText;
+
+                    image.style.objectFit =
+                        "cover";
+
+                    image.style.background =
+                        "#101217";
+
+                }
 
 
                 const name =
@@ -3637,6 +4530,515 @@ async function startNativeWindowAudioBridge() {
 
 /*
 ================================
+VÍDEO NATIVO DA JANELA
+
+WGC / HOOK / WIN32 -> VIDEOFRAME -> CANVAS -> MEDIASTREAM
+================================
+*/
+
+function stopNativeWindowVideoBridge() {
+
+    if (nativeVideoPollTimer) {
+
+        clearInterval(
+            nativeVideoPollTimer
+        );
+
+        nativeVideoPollTimer =
+            null;
+
+    }
+
+
+    if (nativeVideoStream) {
+
+        nativeVideoStream
+            .getTracks()
+            .forEach(
+                track =>
+                    track.stop()
+            );
+
+    }
+
+
+    nativeVideoStream =
+        null;
+
+    nativeVideoCanvas =
+        null;
+
+    nativeVideoContext =
+        null;
+
+    nativeVideoLastFrameNumber =
+        -1;
+
+    nativeVideoTimestamp =
+        0;
+
+    nativeVideoLastBackend =
+        null;
+
+
+    if (nativeVideo) {
+
+        try {
+
+            nativeVideo
+                .stopWindowCapture();
+
+        }
+        catch (error) {
+
+            console.warn(
+                "Erro ao parar KSF Capture Engine:",
+                error
+            );
+
+        }
+
+    }
+}
+
+
+function getWindowHandleFromSourceIdRenderer(
+    sourceId
+) {
+
+    if (
+        typeof sourceId !== "string" ||
+        !sourceId.startsWith("window:")
+    ) {
+        return null;
+    }
+
+
+    const parts =
+        sourceId.split(":");
+
+
+    if (
+        parts.length < 3 ||
+        !/^\d+$/.test(parts[1]) ||
+        parts[1] === "0"
+    ) {
+        return null;
+    }
+
+
+    return parts[1];
+}
+
+
+async function startNativeWindowVideoBridge(
+    sourceId,
+    profile
+) {
+
+    stopNativeWindowVideoBridge();
+
+
+    if (
+        !nativeVideo ||
+        typeof nativeVideo.startWindowCapture !==
+            "function" ||
+        !nativeVideo.isVideoCaptureSupported()
+    ) {
+
+        throw new Error(
+            "KSF Capture Engine nativo indisponível."
+        );
+
+    }
+
+
+    const hwnd =
+        getWindowHandleFromSourceIdRenderer(
+            sourceId
+        );
+
+
+    if (!hwnd) {
+
+        throw new Error(
+            "HWND inválido para o KSF Capture Engine."
+        );
+
+    }
+
+
+    const startResult =
+        nativeVideo.startWindowCapture(
+            hwnd
+        );
+
+
+    if (
+        !startResult ||
+        startResult.success !== true
+    ) {
+
+        throw new Error(
+            "O KSF Capture Engine não conseguiu iniciar a janela."
+        );
+
+    }
+
+
+    console.log(
+        "KSF Capture Engine startWindowCapture:",
+        startResult
+    );
+
+
+    let firstFrame = null;
+    const firstFrameDeadline =
+        performance.now() + 10000;
+
+
+    while (
+        performance.now() <
+        firstFrameDeadline
+    ) {
+
+        const candidate =
+            nativeVideo.readVideoFrame();
+
+
+        if (
+            candidate &&
+            candidate.active &&
+            candidate.hasFrame &&
+            candidate.data &&
+            Number(candidate.width) > 0 &&
+            Number(candidate.height) > 0
+        ) {
+
+            firstFrame =
+                candidate;
+
+            break;
+
+        }
+
+
+        await new Promise(
+            resolve =>
+                setTimeout(
+                    resolve,
+                    25
+                )
+        );
+
+    }
+
+
+    if (!firstFrame) {
+
+        const nativeStatus =
+            typeof nativeVideo.getVideoCaptureStatus ===
+                "function"
+                ? nativeVideo.getVideoCaptureStatus()
+                : null;
+
+        stopNativeWindowVideoBridge();
+
+        throw new Error(
+            "O KSF Capture Engine iniciou, mas não entregou nenhum frame em 10 segundos. Status: " +
+            JSON.stringify(nativeStatus)
+        );
+
+    }
+
+
+    console.log(
+        "KSF Capture Engine primeiro frame:",
+        {
+            width: firstFrame.width,
+            height: firstFrame.height,
+            frameNumber: firstFrame.frameNumber,
+            backend:
+                firstFrame.backend ||
+                startResult.backend ||
+                null,
+            bytes: firstFrame.data.length
+        }
+    );
+
+
+    nativeVideoCanvas =
+        document.createElement(
+            "canvas"
+        );
+
+    nativeVideoCanvas.width =
+        Math.max(
+            2,
+            Number(firstFrame.width) ||
+                Number(profile.width) ||
+                1920
+        );
+
+    nativeVideoCanvas.height =
+        Math.max(
+            2,
+            Number(firstFrame.height) ||
+                Number(profile.height) ||
+                1080
+        );
+
+
+    nativeVideoContext =
+        nativeVideoCanvas.getContext(
+            "2d",
+            {
+                alpha: false,
+                desynchronized: true
+            }
+        );
+
+
+    if (!nativeVideoContext) {
+
+        stopNativeWindowVideoBridge();
+
+        throw new Error(
+            "Não foi possível criar o canvas do KSF Capture Engine."
+        );
+
+    }
+
+
+    const targetFps =
+        Math.max(
+            1,
+            Math.min(
+                60,
+                Number(profile.fps) || 30
+            )
+        );
+
+
+    nativeVideoStream =
+        nativeVideoCanvas.captureStream(
+            targetFps
+        );
+
+
+    const pollInterval =
+        Math.max(
+            8,
+            Math.floor(
+                1000 / targetFps
+            )
+        );
+
+
+    nativeVideoPollTimer =
+        setInterval(
+            () => {
+
+                if (
+                    !nativeVideo ||
+                    !nativeVideoContext ||
+                    !nativeVideoCanvas
+                ) {
+                    return;
+                }
+
+
+                try {
+
+                    const frame =
+                        nativeVideo
+                            .readVideoFrame();
+
+
+                    if (
+                        !frame ||
+                        !frame.active ||
+                        !frame.hasFrame ||
+                        !frame.data ||
+                        frame.frameNumber ===
+                            nativeVideoLastFrameNumber
+                    ) {
+                        return;
+                    }
+
+
+                    const currentBackend =
+                        frame.backend ||
+                        (
+                            typeof nativeVideo.getVideoCaptureStatus ===
+                                "function"
+                                ? nativeVideo.getVideoCaptureStatus()?.backend
+                                : null
+                        );
+
+
+                    if (
+                        currentBackend &&
+                        currentBackend !== nativeVideoLastBackend
+                    ) {
+
+                        nativeVideoLastBackend =
+                            currentBackend;
+
+                        console.log(
+                            "KSF Capture Engine backend ativo:",
+                            currentBackend
+                        );
+
+                    }
+
+
+                    const width =
+                        Number(frame.width);
+
+                    const height =
+                        Number(frame.height);
+
+
+                    if (
+                        !Number.isFinite(width) ||
+                        !Number.isFinite(height) ||
+                        width <= 0 ||
+                        height <= 0
+                    ) {
+                        return;
+                    }
+
+
+                    nativeVideoLastFrameNumber =
+                        frame.frameNumber;
+
+
+                    if (
+                        nativeVideoCanvas.width !==
+                            width ||
+                        nativeVideoCanvas.height !==
+                            height
+                    ) {
+
+                        nativeVideoCanvas.width =
+                            width;
+
+                        nativeVideoCanvas.height =
+                            height;
+
+                        nativeVideoContext =
+                            nativeVideoCanvas.getContext(
+                                "2d",
+                                {
+                                    alpha: false,
+                                    desynchronized: true
+                                }
+                            );
+
+                    }
+
+
+                    const bytes =
+                        Buffer.isBuffer(
+                            frame.data
+                        )
+                            ? frame.data
+                            : Buffer.from(
+                                frame.data
+                            );
+
+
+                    nativeVideoTimestamp +=
+                        Math.round(
+                            1000000 / targetFps
+                        );
+
+
+                    const frameView =
+                        new Uint8Array(
+                            bytes.buffer,
+                            bytes.byteOffset,
+                            bytes.byteLength
+                        );
+
+
+                    const videoFrame =
+                        new VideoFrame(
+                            frameView,
+                            {
+                                format: "BGRA",
+                                codedWidth: width,
+                                codedHeight: height,
+                                timestamp:
+                                    nativeVideoTimestamp
+                            }
+                        );
+
+
+                    nativeVideoContext.drawImage(
+                        videoFrame,
+                        0,
+                        0,
+                        width,
+                        height
+                    );
+
+
+                    videoFrame.close();
+
+                }
+                catch (error) {
+
+                    console.error(
+                        "Erro ao desenhar frame do KSF Capture Engine:",
+                        error
+                    );
+
+                }
+
+            },
+            pollInterval
+        );
+
+
+    const videoTrack =
+        nativeVideoStream
+            .getVideoTracks()[0];
+
+
+    if (!videoTrack) {
+
+        stopNativeWindowVideoBridge();
+
+        throw new Error(
+            "O KSF Capture Engine não criou uma MediaStreamTrack de vídeo."
+        );
+
+    }
+
+
+    console.log(
+        "KSF Capture Engine da janela iniciado:",
+        {
+            hwnd,
+            fps: targetFps,
+            backend:
+                nativeVideoLastBackend ||
+                startResult.backend ||
+                null
+        }
+    );
+
+
+    return new MediaStream([
+        videoTrack
+    ]);
+}
+
+
+/*
+================================
 CAPTURAR TELA
 ================================
 */
@@ -3706,17 +5108,10 @@ async function captureScreen(
     if (isWindow) {
 
         const stream =
-            await navigator
-                .mediaDevices
-                .getDisplayMedia({
-
-                    video:
-                        videoConstraints,
-
-                    audio:
-                        false
-
-                });
+            await startNativeWindowVideoBridge(
+                sourceId,
+                profile
+            );
 
 
         try {
@@ -3848,6 +5243,8 @@ async function startSharing(
     */
 
     if (localStream) {
+
+        stopNativeWindowVideoBridge();
 
         await stopNativeWindowAudioBridge();
 
@@ -4011,6 +5408,13 @@ function stopLocalTransmission(
     resetStatus = true
 ) {
 
+    if (watchingSelfPreview) {
+        stopWatching(false);
+    }
+
+
+    stopNativeWindowVideoBridge();
+
     stopNativeWindowAudioBridge();
 
 
@@ -4151,6 +5555,10 @@ async function loadAppVersion() {
 
 
 function resetUpdateButtons() {
+
+    updatePanel.classList.remove(
+        "update-available"
+    );
 
     checkUpdateButton.style.display =
         "block";
@@ -4344,11 +5752,15 @@ ipcRenderer.on(
             "checking"
         ) {
 
-            updateMessage.textContent =
-                "Verificando atualizações...";
+            if (!data.automatic) {
 
-            checkUpdateButton.disabled =
-                true;
+                updateMessage.textContent =
+                    "Verificando atualizações...";
+
+                checkUpdateButton.disabled =
+                    true;
+
+            }
 
         }
 
@@ -4373,6 +5785,10 @@ ipcRenderer.on(
 
             installUpdateButton.style.display =
                 "none";
+
+            highlightAvailableUpdate(
+                data.version
+            );
 
         }
 
@@ -4492,6 +5908,11 @@ updateShareButtons();
 updateQualityBadge();
 
 updateAudioBadge();
+
+volumeControl.style.display =
+    "none";
+
+updateVolumeUI();
 
 resetUpdateButtons();
 

@@ -917,6 +917,195 @@ io.on(
 
         /*
         ================================
+        SAIR DA SALA SEM DESCONECTAR
+        ================================
+        */
+
+        socket.on(
+            "leave-room",
+            () => {
+
+                const {
+                    roomCode,
+                    room
+                } =
+                    getSocketRoom(
+                        socket
+                    );
+
+
+                if (
+                    !roomCode ||
+                    !room
+                ) {
+
+                    socket.data.roomCode =
+                        null;
+
+                    socket.data.isHost =
+                        false;
+
+                    socket.emit(
+                        "room-left"
+                    );
+
+                    return;
+                }
+
+
+                const participant =
+                    room.participants.get(
+                        socket.id
+                    );
+
+
+                room.participants.delete(
+                    socket.id
+                );
+
+
+                console.log(
+                    "Participante saiu voluntariamente:",
+                    roomCode,
+                    participant
+                        ? participant.name
+                        : socket.id
+                );
+
+
+                socket
+                    .to(roomCode)
+                    .emit(
+                        "participant-left",
+                        {
+                            participantId:
+                                socket.id
+                        }
+                    );
+
+
+                /*
+                Se quem saiu for o dono,
+                a sala inteira é encerrada.
+                */
+
+                if (
+                    room.hostId ===
+                        socket.id
+                ) {
+
+                    socket
+                        .to(roomCode)
+                        .emit(
+                            "host-left"
+                        );
+
+
+                    for (
+                        const participantId
+                        of room.participants.keys()
+                    ) {
+
+                        const participantSocket =
+                            io.sockets.sockets.get(
+                                participantId
+                            );
+
+
+                        if (!participantSocket) {
+                            continue;
+                        }
+
+
+                        participantSocket.data.roomCode =
+                            null;
+
+                        participantSocket.data.isHost =
+                            false;
+
+                        participantSocket.leave(
+                            roomCode
+                        );
+
+                    }
+
+
+                    rooms.delete(
+                        roomCode
+                    );
+
+
+                    console.log(
+                        "Sala encerrada pelo dono:",
+                        roomCode
+                    );
+
+                }
+
+                else {
+
+                    /*
+                    Participante comum:
+                    apenas ele sai da sala.
+                    */
+
+                    socket.leave(
+                        roomCode
+                    );
+
+
+                    if (
+                        room.participants.size ===
+                            0
+                    ) {
+
+                        rooms.delete(
+                            roomCode
+                        );
+
+                    }
+
+                    else {
+
+                        emitRoomState(
+                            roomCode
+                        );
+
+                    }
+
+                }
+
+
+                /*
+                Limpa o estado da sala
+                sem desconectar o Socket.IO.
+
+                Assim o mesmo usuário pode
+                criar ou entrar em outra sala.
+                */
+
+                socket.data.roomCode =
+                    null;
+
+                socket.data.isHost =
+                    false;
+
+
+                socket.leave(
+                    roomCode
+                );
+
+
+                socket.emit(
+                    "room-left"
+                );
+
+            }
+        );
+
+
+        /*
+        ================================
         DESCONEXÃO
         ================================
         */
@@ -1009,7 +1198,7 @@ io.on(
 
                 if (
                     room.participants.size ===
-                    0
+                        0
                 ) {
 
                     rooms.delete(
