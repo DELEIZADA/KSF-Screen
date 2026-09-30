@@ -48,7 +48,6 @@ async function testDatabaseConnection() {
         return;
     }
 
-
     try {
 
         await db.query(
@@ -72,6 +71,12 @@ async function testDatabaseConnection() {
 
 }
 
+
+/*
+================================
+SOCKET.IO
+================================
+*/
 
 const io =
     new Server(
@@ -114,7 +119,7 @@ app.get(
         res.send(`
             <h1>KSF Screen Server</h1>
             <p>Servidor Multi-Stream online e funcionando!</p>
-            <p>KSF Screen Server V0.6.1 FIX</p>
+            <p>KSF Screen Server V0.7.0</p>
         `);
 
     }
@@ -332,6 +337,177 @@ app.post(
                     success: false,
                     message:
                         "Não foi possível criar a conta."
+                });
+
+        }
+
+    }
+);
+
+
+/*
+================================
+ENTRAR NA CONTA
+================================
+*/
+
+app.post(
+    "/api/auth/login",
+    async (req, res) => {
+
+        if (!db) {
+
+            return res
+                .status(503)
+                .json({
+                    success: false,
+                    message:
+                        "Banco de dados indisponível."
+                });
+
+        }
+
+
+        const identifier =
+            typeof req.body?.identifier ===
+                "string"
+
+                ? req.body.identifier.trim()
+                : "";
+
+
+        const password =
+            typeof req.body?.password ===
+                "string"
+
+                ? req.body.password
+                : "";
+
+
+        if (
+            !identifier ||
+            !password
+        ) {
+
+            return res
+                .status(400)
+                .json({
+                    success: false,
+                    message:
+                        "Informe seu nome de usuário ou ID KSF e sua senha."
+                });
+
+        }
+
+
+        try {
+
+            const result =
+                await db.query(
+                    `
+                    SELECT
+                        ksf_id,
+                        username,
+                        password_hash,
+                        recovery_email,
+                        recovery_email_verified,
+                        created_at
+                    FROM ksf_users
+                    WHERE
+                        LOWER(username) = LOWER($1)
+                        OR UPPER(ksf_id) = UPPER($1)
+                    LIMIT 1
+                    `,
+                    [
+                        identifier
+                    ]
+                );
+
+
+            if (
+                result.rowCount ===
+                0
+            ) {
+
+                return res
+                    .status(401)
+                    .json({
+                        success: false,
+                        message:
+                            "Nome de usuário, ID KSF ou senha incorretos."
+                    });
+
+            }
+
+
+            const user =
+                result.rows[0];
+
+
+            const passwordMatches =
+                await bcrypt.compare(
+                    password,
+                    user.password_hash
+                );
+
+
+            if (!passwordMatches) {
+
+                return res
+                    .status(401)
+                    .json({
+                        success: false,
+                        message:
+                            "Nome de usuário, ID KSF ou senha incorretos."
+                    });
+
+            }
+
+
+            console.log(
+                "Login realizado:",
+                user.ksf_id
+            );
+
+
+            return res
+                .status(200)
+                .json({
+                    success: true,
+
+                    user: {
+                        ksfId:
+                            user.ksf_id,
+
+                        username:
+                            user.username,
+
+                        recoveryEmailVerified:
+                            Boolean(
+                                user.recovery_email_verified
+                            ),
+
+                        createdAt:
+                            user.created_at
+                    }
+                });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Erro ao entrar na conta:",
+                error.message
+            );
+
+
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message:
+                        "Não foi possível entrar na conta."
                 });
 
         }
@@ -1496,7 +1672,7 @@ server.listen(
         );
 
         console.log(
-            "   KSF SCREEN SERVER V0.6.1 FIX"
+            "   KSF SCREEN SERVER V0.7.0"
         );
 
         console.log(
