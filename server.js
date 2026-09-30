@@ -2,8 +2,16 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const { Pool } = require("pg");
+const bcrypt = require("bcryptjs");
 
 const app = express();
+
+app.use(
+    express.json({
+        limit: "16kb"
+    })
+);
+
 const server = http.createServer(app);
 
 
@@ -13,16 +21,21 @@ BANCO DE DADOS POSTGRESQL
 ================================
 */
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl =
+    process.env.DATABASE_URL;
 
 const db = databaseUrl
     ? new Pool({
-        connectionString: databaseUrl,
+        connectionString:
+            databaseUrl,
+
         ssl: {
-            rejectUnauthorized: false
+            rejectUnauthorized:
+                false
         }
     })
     : null;
+
 
 async function testDatabaseConnection() {
 
@@ -34,6 +47,7 @@ async function testDatabaseConnection() {
 
         return;
     }
+
 
     try {
 
@@ -55,20 +69,26 @@ async function testDatabaseConnection() {
         );
 
     }
+
 }
 
 
-const io = new Server(server, {
-    cors: {
-        origin: "*"
-    }
-});
+const io =
+    new Server(
+        server,
+        {
+            cors: {
+                origin: "*"
+            }
+        }
+    );
 
 
 // Local = 3000
 // Online = usa automaticamente a porta fornecida pelo servidor
 const PORT =
-    process.env.PORT || 3000;
+    process.env.PORT ||
+    3000;
 
 
 /*
@@ -77,7 +97,8 @@ SALAS
 ================================
 */
 
-const rooms = new Map();
+const rooms =
+    new Map();
 
 
 /*
@@ -102,6 +123,225 @@ app.get(
 
 /*
 ================================
+CADASTRAR CONTA
+================================
+*/
+
+app.post(
+    "/api/auth/register",
+    async (req, res) => {
+
+        if (!db) {
+
+            return res
+                .status(503)
+                .json({
+                    success: false,
+                    message:
+                        "Banco de dados indisponível."
+                });
+
+        }
+
+
+        const username =
+            typeof req.body?.username ===
+                "string"
+
+                ? req.body.username.trim()
+                : "";
+
+
+        const password =
+            typeof req.body?.password ===
+                "string"
+
+                ? req.body.password
+                : "";
+
+
+        if (
+            username.length < 3 ||
+            username.length > 24
+        ) {
+
+            return res
+                .status(400)
+                .json({
+                    success: false,
+                    message:
+                        "O nome de usuário deve ter entre 3 e 24 caracteres."
+                });
+
+        }
+
+
+        if (
+            !/^[A-Za-z0-9_.-]+$/.test(
+                username
+            )
+        ) {
+
+            return res
+                .status(400)
+                .json({
+                    success: false,
+                    message:
+                        "O nome de usuário pode usar apenas letras, números, ponto, hífen e underline."
+                });
+
+        }
+
+
+        if (
+            password.length < 8 ||
+            password.length > 72
+        ) {
+
+            return res
+                .status(400)
+                .json({
+                    success: false,
+                    message:
+                        "A senha deve ter entre 8 e 72 caracteres."
+                });
+
+        }
+
+
+        try {
+
+            const existingUser =
+                await db.query(
+                    `
+                    SELECT id
+                    FROM ksf_users
+                    WHERE LOWER(username) = LOWER($1)
+                    LIMIT 1
+                    `,
+                    [
+                        username
+                    ]
+                );
+
+
+            if (
+                existingUser.rowCount >
+                0
+            ) {
+
+                return res
+                    .status(409)
+                    .json({
+                        success: false,
+                        message:
+                            "Esse nome de usuário já está em uso."
+                    });
+
+            }
+
+
+            const passwordHash =
+                await bcrypt.hash(
+                    password,
+                    12
+                );
+
+
+            const result =
+                await db.query(
+                    `
+                    INSERT INTO ksf_users
+                    (
+                        username,
+                        password_hash
+                    )
+                    VALUES
+                    (
+                        $1,
+                        $2
+                    )
+                    RETURNING
+                        ksf_id,
+                        username,
+                        created_at
+                    `,
+                    [
+                        username,
+                        passwordHash
+                    ]
+                );
+
+
+            const user =
+                result.rows[0];
+
+
+            console.log(
+                "Nova conta criada:",
+                user.ksf_id
+            );
+
+
+            return res
+                .status(201)
+                .json({
+                    success: true,
+
+                    user: {
+                        ksfId:
+                            user.ksf_id,
+
+                        username:
+                            user.username,
+
+                        createdAt:
+                            user.created_at
+                    }
+                });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Erro ao criar conta:",
+                error.message
+            );
+
+
+            if (
+                error.code ===
+                "23505"
+            ) {
+
+                return res
+                    .status(409)
+                    .json({
+                        success: false,
+                        message:
+                            "Esse nome de usuário já está em uso."
+                    });
+
+            }
+
+
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message:
+                        "Não foi possível criar a conta."
+                });
+
+        }
+
+    }
+);
+
+
+/*
+================================
 NORMALIZAR CÓDIGO DA SALA
 ================================
 */
@@ -111,7 +351,8 @@ function normalizeRoomCode(
 ) {
 
     return String(
-        roomCode || ""
+        roomCode ||
+        ""
     )
         .trim()
         .toUpperCase();
@@ -145,8 +386,11 @@ function getSocketRoom(
 
     return {
         roomCode,
+
         room:
-            rooms.get(roomCode) ||
+            rooms.get(
+                roomCode
+            ) ||
             null
     };
 
@@ -169,7 +413,8 @@ function createParticipant(
         room.nextParticipantNumber;
 
 
-    room.nextParticipantNumber += 1;
+    room.nextParticipantNumber +=
+        1;
 
 
     return {
@@ -182,7 +427,9 @@ function createParticipant(
             participantNumber,
 
         isHost:
-            Boolean(isHost),
+            Boolean(
+                isHost
+            ),
 
         broadcasting:
             false
@@ -238,7 +485,9 @@ function emitRoomState(
 ) {
 
     const room =
-        rooms.get(roomCode);
+        rooms.get(
+            roomCode
+        );
 
 
     if (!room) {
@@ -247,14 +496,18 @@ function emitRoomState(
 
 
     io
-        .to(roomCode)
+        .to(
+            roomCode
+        )
         .emit(
             "room-state",
             {
                 roomCode,
 
                 participants:
-                    getRoomState(room)
+                    getRoomState(
+                        room
+                    )
             }
         );
 
@@ -316,7 +569,8 @@ io.on(
 
 
                 if (
-                    roomCode.length !== 6
+                    roomCode.length !==
+                    6
                 ) {
 
                     socket.emit(
@@ -329,7 +583,9 @@ io.on(
 
 
                 if (
-                    rooms.has(roomCode)
+                    rooms.has(
+                        roomCode
+                    )
                 ) {
 
                     socket.emit(
@@ -469,6 +725,7 @@ io.on(
                                 )
                         }
                     );
+
 
                     emitRoomState(
                         roomCode
@@ -654,7 +911,9 @@ io.on(
 
 
                 socket
-                    .to(roomCode)
+                    .to(
+                        roomCode
+                    )
                     .emit(
                         "participant-broadcast-stopped",
                         {
@@ -752,7 +1011,9 @@ io.on(
 
 
                 io
-                    .to(broadcasterId)
+                    .to(
+                        broadcasterId
+                    )
                     .emit(
                         "viewer-request",
                         {
@@ -822,7 +1083,9 @@ io.on(
 
 
                 io
-                    .to(broadcasterId)
+                    .to(
+                        broadcasterId
+                    )
                     .emit(
                         "viewer-left",
                         {
@@ -893,7 +1156,9 @@ io.on(
 
 
                 io
-                    .to(targetId)
+                    .to(
+                        targetId
+                    )
                     .emit(
                         "signal",
                         {
@@ -977,7 +1242,9 @@ io.on(
 
 
                 socket
-                    .to(roomCode)
+                    .to(
+                        roomCode
+                    )
                     .emit(
                         "participant-left",
                         {
@@ -993,7 +1260,9 @@ io.on(
                 ) {
 
                     socket
-                        .to(roomCode)
+                        .to(
+                            roomCode
+                        )
                         .emit(
                             "host-left"
                         );
@@ -1010,7 +1279,9 @@ io.on(
                             );
 
 
-                        if (!participantSocket) {
+                        if (
+                            !participantSocket
+                        ) {
                             continue;
                         }
 
@@ -1140,7 +1411,9 @@ io.on(
 
 
                 socket
-                    .to(roomCode)
+                    .to(
+                        roomCode
+                    )
                     .emit(
                         "participant-left",
                         {
@@ -1156,7 +1429,9 @@ io.on(
                 ) {
 
                     socket
-                        .to(roomCode)
+                        .to(
+                            roomCode
+                        )
                         .emit(
                             "host-left"
                         );
