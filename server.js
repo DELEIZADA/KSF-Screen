@@ -1,9 +1,62 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
+const { Pool } = require("pg");
 
 const app = express();
 const server = http.createServer(app);
+
+
+/*
+================================
+BANCO DE DADOS POSTGRESQL
+================================
+*/
+
+const databaseUrl = process.env.DATABASE_URL;
+
+const db = databaseUrl
+    ? new Pool({
+        connectionString: databaseUrl,
+        ssl: {
+            rejectUnauthorized: false
+        }
+    })
+    : null;
+
+async function testDatabaseConnection() {
+
+    if (!db) {
+
+        console.log(
+            "Banco de dados PostgreSQL: DATABASE_URL não configurada"
+        );
+
+        return;
+    }
+
+    try {
+
+        await db.query(
+            "SELECT 1"
+        );
+
+        console.log(
+            "Banco de dados PostgreSQL: CONECTADO"
+        );
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Banco de dados PostgreSQL: ERRO DE CONEXÃO",
+            error.message
+        );
+
+    }
+}
+
 
 const io = new Server(server, {
     cors: {
@@ -21,23 +74,6 @@ const PORT =
 /*
 ================================
 SALAS
-
-Cada sala possui:
-
-{
-    hostId: "socket-id",
-
-    nextParticipantNumber: 4,
-
-    participants: Map {
-        socketId => {
-            id,
-            name,
-            isHost,
-            broadcasting
-        }
-    }
-}
 ================================
 */
 
@@ -802,15 +838,6 @@ io.on(
         /*
         ================================
         SINALIZAÇÃO WEBRTC DIRECIONADA
-
-        V0.6.1:
-        connectionId diferencia duas conexões
-        simultâneas entre os mesmos usuários.
-
-        Exemplo:
-        A transmite para B
-        enquanto
-        B transmite para A.
         ================================
         */
 
@@ -854,11 +881,6 @@ io.on(
                 }
 
 
-                /*
-                Impede sinalização para alguém
-                que não pertence à mesma sala.
-                */
-
                 if (
                     !isParticipantInRoom(
                         room,
@@ -869,25 +891,6 @@ io.on(
                     return;
                 }
 
-
-                /*
-                IMPORTANTE:
-
-                Além do sourceId, repassamos
-                connectionId.
-
-                Assim o cliente consegue saber
-                a qual RTCPeerConnection pertencem
-                offer, answer e ICE.
-
-                Isso evita misturar:
-
-                transmissão A -> B
-
-                com
-
-                transmissão B -> A.
-                */
 
                 io
                     .to(targetId)
@@ -984,11 +987,6 @@ io.on(
                     );
 
 
-                /*
-                Se quem saiu for o dono,
-                a sala inteira é encerrada.
-                */
-
                 if (
                     room.hostId ===
                         socket.id
@@ -1044,11 +1042,6 @@ io.on(
 
                 else {
 
-                    /*
-                    Participante comum:
-                    apenas ele sai da sala.
-                    */
-
                     socket.leave(
                         roomCode
                     );
@@ -1075,14 +1068,6 @@ io.on(
 
                 }
 
-
-                /*
-                Limpa o estado da sala
-                sem desconectar o Socket.IO.
-
-                Assim o mesmo usuário pode
-                criar ou entrar em outra sala.
-                */
 
                 socket.data.roomCode =
                     null;
@@ -1165,10 +1150,6 @@ io.on(
                     );
 
 
-                /*
-                HOST SAIU
-                */
-
                 if (
                     room.hostId ===
                     socket.id
@@ -1229,7 +1210,9 @@ INICIAR SERVIDOR
 server.listen(
     PORT,
     "0.0.0.0",
-    () => {
+    async () => {
+
+        await testDatabaseConnection();
 
         console.log("");
 
