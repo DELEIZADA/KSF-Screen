@@ -3,6 +3,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const app = express();
 
@@ -124,6 +125,152 @@ app.get(
 
     }
 );
+
+
+/*
+================================
+SESSÕES SEGURAS DA CONTA
+================================
+*/
+
+const authSessions = new Map();
+
+const AUTH_SESSION_DURATION_MS =
+    1000 * 60 * 60 * 24 * 30;
+
+
+function createAuthSession(
+    ksfId
+) {
+
+    const token =
+        crypto
+            .randomBytes(48)
+            .toString("hex");
+
+    authSessions.set(
+        token,
+        {
+            ksfId,
+            expiresAt:
+                Date.now() +
+                AUTH_SESSION_DURATION_MS
+        }
+    );
+
+    return token;
+}
+
+
+function getBearerToken(
+    req
+) {
+
+    const authorization =
+        typeof req.headers.authorization ===
+            "string"
+            ? req.headers.authorization
+            : "";
+
+    if (
+        !authorization.startsWith(
+            "Bearer "
+        )
+    ) {
+        return null;
+    }
+
+    const token =
+        authorization
+            .slice(7)
+            .trim();
+
+    return token || null;
+}
+
+
+function getAuthSession(
+    req
+) {
+
+    const token =
+        getBearerToken(req);
+
+    if (!token) {
+        return null;
+    }
+
+    const session =
+        authSessions.get(token);
+
+    if (!session) {
+        return null;
+    }
+
+    if (
+        session.expiresAt <=
+        Date.now()
+    ) {
+
+        authSessions.delete(token);
+        return null;
+    }
+
+    return {
+        token,
+        ...session
+    };
+}
+
+
+function requireAuthSession(
+    req,
+    res,
+    next
+) {
+
+    const session =
+        getAuthSession(req);
+
+    if (!session) {
+
+        return res
+            .status(401)
+            .json({
+                success: false,
+                message:
+                    "Sessão inválida ou expirada. Entre novamente."
+            });
+    }
+
+    req.authSession =
+        session;
+
+    next();
+}
+
+
+setInterval(
+    () => {
+
+        const now =
+            Date.now();
+
+        for (
+            const [token, session]
+            of authSessions.entries()
+        ) {
+
+            if (
+                session.expiresAt <=
+                now
+            ) {
+                authSessions.delete(token);
+            }
+        }
+    },
+    1000 * 60 * 60
+).unref();
 
 
 /*
@@ -464,6 +611,12 @@ app.post(
             }
 
 
+            const token =
+                createAuthSession(
+                    user.ksf_id
+                );
+
+
             console.log(
                 "Login realizado:",
                 user.ksf_id
@@ -474,6 +627,8 @@ app.post(
                 .status(200)
                 .json({
                     success: true,
+
+                    token,
 
                     user: {
                         ksfId:
@@ -512,6 +667,134 @@ app.post(
 
         }
 
+    }
+);
+
+
+/*
+================================
+SESSÃO ATUAL
+================================
+*/
+
+app.get(
+    "/api/auth/me",
+    requireAuthSession,
+    async (req, res) => {
+
+        if (!db) {
+
+            return res
+                .status(503)
+                .json({
+                    success: false,
+                    message:
+                        "Banco de dados indisponível."
+                });
+        }
+
+        try {
+
+            const result =
+                await db.query(
+                    `
+                    SELECT
+                        ksf_id,
+                        username,
+                        recovery_email_verified,
+                        created_at
+                    FROM ksf_users
+                    WHERE ksf_id = $1
+                    LIMIT 1
+                    `,
+                    [
+                        req.authSession.ksfId
+                    ]
+                );
+
+            if (
+                result.rowCount ===
+                0
+            ) {
+
+                authSessions.delete(
+                    req.authSession.token
+                );
+
+                return res
+                    .status(401)
+                    .json({
+                        success: false,
+                        message:
+                            "Conta não encontrada."
+                    });
+            }
+
+            const user =
+                result.rows[0];
+
+            return res
+                .status(200)
+                .json({
+                    success: true,
+
+                    user: {
+                        ksfId:
+                            user.ksf_id,
+
+                        username:
+                            user.username,
+
+                        recoveryEmailVerified:
+                            Boolean(
+                                user.recovery_email_verified
+                            ),
+
+                        createdAt:
+                            user.created_at
+                    }
+                });
+        }
+
+        catch (error) {
+
+            console.error(
+                "Erro ao consultar sessão:",
+                error.message
+            );
+
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message:
+                        "Não foi possível consultar a conta."
+                });
+        }
+    }
+);
+
+
+/*
+================================
+SAIR DA CONTA
+================================
+*/
+
+app.post(
+    "/api/auth/logout",
+    requireAuthSession,
+    (req, res) => {
+
+        authSessions.delete(
+            req.authSession.token
+        );
+
+        return res
+            .status(200)
+            .json({
+                success: true
+            });
     }
 );
 

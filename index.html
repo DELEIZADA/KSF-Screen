@@ -110,6 +110,68 @@ BARRA DA JANELA
 }
 
 
+
+
+/*
+================================
+CONTA KSF
+================================
+*/
+
+#auth {
+    min-height: calc(100vh - 36px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-card {
+    width: 460px;
+    background: #181b22;
+    padding: 40px;
+    border-radius: 18px;
+    text-align: center;
+}
+
+.auth-card h1 {
+    margin-bottom: 8px;
+}
+
+.auth-subtitle {
+    color: #9da3ae;
+    margin-bottom: 24px;
+}
+
+.auth-card input {
+    text-transform: none;
+}
+
+.auth-switch {
+    margin-top: 18px;
+    color: #9da3ae;
+    font-size: 14px;
+}
+
+.auth-link {
+    padding: 0;
+    background: transparent;
+    color: #7d87ff;
+    font-size: 14px;
+}
+
+.auth-message {
+    min-height: 20px;
+    margin-top: 14px;
+    color: #ff7478;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.auth-message.success {
+    color: #23d18b;
+}
+
+
 /*
 ================================
 HOME
@@ -118,7 +180,7 @@ HOME
 
 #home {
     min-height: calc(100vh - 36px);
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
 }
@@ -694,6 +756,90 @@ BARRA DA JANELA
 
 <!--
 ================================
+CONTA KSF
+================================
+-->
+
+<div id="auth">
+
+    <div class="auth-card">
+
+        <h1>KSF Screen</h1>
+
+        <div class="auth-subtitle" id="authSubtitle">
+            Entre na sua conta KSF.
+        </div>
+
+        <div id="loginForm">
+
+            <input
+                id="loginIdentifier"
+                autocomplete="username"
+                placeholder="Nome de usuário ou ID KSF">
+
+            <input
+                id="loginPassword"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Senha">
+
+            <button
+                id="loginButton"
+                class="primary full">
+                Entrar
+            </button>
+
+            <div class="auth-switch">
+                Ainda não tem uma conta?
+                <button id="showRegisterButton" class="auth-link">Criar conta</button>
+            </div>
+
+        </div>
+
+        <div id="registerForm" style="display: none;">
+
+            <input
+                id="registerUsername"
+                maxlength="24"
+                autocomplete="username"
+                placeholder="Nome de usuário">
+
+            <input
+                id="registerPassword"
+                type="password"
+                maxlength="72"
+                autocomplete="new-password"
+                placeholder="Senha (mínimo 8 caracteres)">
+
+            <input
+                id="registerPasswordConfirm"
+                type="password"
+                maxlength="72"
+                autocomplete="new-password"
+                placeholder="Confirmar senha">
+
+            <button
+                id="registerButton"
+                class="primary full">
+                Criar conta
+            </button>
+
+            <div class="auth-switch">
+                Já tem uma conta?
+                <button id="showLoginButton" class="auth-link">Entrar</button>
+            </div>
+
+        </div>
+
+        <div id="authMessage" class="auth-message"></div>
+
+    </div>
+
+</div>
+
+
+<!--
+================================
 HOME
 ================================
 -->
@@ -1056,6 +1202,54 @@ const windowCloseButton =
     );
 
 
+const auth =
+    document.getElementById("auth");
+
+const loginForm =
+    document.getElementById("loginForm");
+
+const registerForm =
+    document.getElementById("registerForm");
+
+const authSubtitle =
+    document.getElementById("authSubtitle");
+
+const authMessage =
+    document.getElementById("authMessage");
+
+const loginIdentifier =
+    document.getElementById("loginIdentifier");
+
+const loginPassword =
+    document.getElementById("loginPassword");
+
+const loginButton =
+    document.getElementById("loginButton");
+
+const showRegisterButton =
+    document.getElementById("showRegisterButton");
+
+const registerUsername =
+    document.getElementById("registerUsername");
+
+const registerPassword =
+    document.getElementById("registerPassword");
+
+const registerPasswordConfirm =
+    document.getElementById("registerPasswordConfirm");
+
+const registerButton =
+    document.getElementById("registerButton");
+
+const showLoginButton =
+    document.getElementById("showLoginButton");
+
+let currentKsfUser = null;
+let currentKsfToken = null;
+
+const KSF_AUTH_TOKEN_KEY =
+    "ksfAuthToken";
+
 const home =
     document.getElementById("home");
 
@@ -1210,6 +1404,454 @@ windowCloseButton.onclick =
         );
 
     };
+
+
+/*
+================================
+CONTA KSF
+================================
+*/
+
+const KSF_SERVER_URL =
+    "https://ksf-screen.onrender.com";
+
+
+function setAuthMessage(
+    message,
+    success = false
+) {
+
+    authMessage.textContent =
+        message || "";
+
+    authMessage.classList.toggle(
+        "success",
+        Boolean(success)
+    );
+
+}
+
+
+function showLoginForm() {
+
+    loginForm.style.display =
+        "block";
+
+    registerForm.style.display =
+        "none";
+
+    authSubtitle.textContent =
+        "Entre na sua conta KSF.";
+
+    setAuthMessage("");
+
+    loginIdentifier.focus();
+
+}
+
+
+function showRegisterForm() {
+
+    loginForm.style.display =
+        "none";
+
+    registerForm.style.display =
+        "block";
+
+    authSubtitle.textContent =
+        "Crie sua conta KSF.";
+
+    setAuthMessage("");
+
+    registerUsername.focus();
+
+}
+
+
+function enterKsfApp(
+    user
+) {
+
+    currentKsfUser =
+        user || null;
+
+    auth.style.display =
+        "none";
+
+    home.style.display =
+        "flex";
+
+}
+
+
+function saveKsfSession(
+    token
+) {
+
+    currentKsfToken =
+        token || null;
+
+    if (currentKsfToken) {
+        localStorage.setItem(
+            KSF_AUTH_TOKEN_KEY,
+            currentKsfToken
+        );
+    }
+    else {
+        localStorage.removeItem(
+            KSF_AUTH_TOKEN_KEY
+        );
+    }
+}
+
+
+function clearKsfSession() {
+
+    currentKsfUser = null;
+    currentKsfToken = null;
+
+    localStorage.removeItem(
+        KSF_AUTH_TOKEN_KEY
+    );
+}
+
+
+async function restoreKsfSession() {
+
+    const savedToken =
+        localStorage.getItem(
+            KSF_AUTH_TOKEN_KEY
+        );
+
+    if (!savedToken) {
+        showLoginForm();
+        return;
+    }
+
+    currentKsfToken =
+        savedToken;
+
+    try {
+
+        const response =
+            await fetch(
+                KSF_SERVER_URL +
+                "/api/auth/me",
+                {
+                    method: "GET",
+
+                    headers: {
+                        "Authorization":
+                            "Bearer " +
+                            savedToken
+                    }
+                }
+            );
+
+        let data = null;
+
+        try {
+            data =
+                await response.json();
+        }
+        catch (error) {
+            data = null;
+        }
+
+        if (
+            !response.ok ||
+            !data ||
+            !data.success ||
+            !data.user
+        ) {
+            clearKsfSession();
+            showLoginForm();
+            return;
+        }
+
+        enterKsfApp(
+            data.user
+        );
+
+    }
+    catch (error) {
+
+        clearKsfSession();
+        showLoginForm();
+
+        setAuthMessage(
+            "Não foi possível restaurar sua sessão. Entre novamente."
+        );
+    }
+}
+
+
+async function sendAuthRequest(
+    route,
+    body
+) {
+
+    const response =
+        await fetch(
+            KSF_SERVER_URL + route,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body:
+                    JSON.stringify(body)
+            }
+        );
+
+
+    let data = null;
+
+    try {
+        data = await response.json();
+    }
+    catch (error) {
+        data = null;
+    }
+
+
+    if (
+        !response.ok ||
+        !data ||
+        !data.success
+    ) {
+
+        throw new Error(
+            data && data.message
+                ? data.message
+                : "Não foi possível conectar ao servidor KSF."
+        );
+
+    }
+
+
+    return data;
+}
+
+
+showRegisterButton.onclick =
+    () => {
+        showRegisterForm();
+    };
+
+
+showLoginButton.onclick =
+    () => {
+        showLoginForm();
+    };
+
+
+loginButton.onclick =
+    async () => {
+
+        const identifier =
+            loginIdentifier.value.trim();
+
+        const password =
+            loginPassword.value;
+
+
+        if (
+            !identifier ||
+            !password
+        ) {
+
+            setAuthMessage(
+                "Preencha seu nome de usuário ou ID KSF e sua senha."
+            );
+
+            return;
+        }
+
+
+        loginButton.disabled =
+            true;
+
+        loginButton.textContent =
+            "Entrando...";
+
+        setAuthMessage("");
+
+
+        try {
+
+            const data =
+                await sendAuthRequest(
+                    "/api/auth/login",
+                    {
+                        identifier,
+                        password
+                    }
+                );
+
+            loginPassword.value =
+                "";
+
+            saveKsfSession(
+                data.token
+            );
+
+            enterKsfApp(
+                data.user
+            );
+
+        }
+
+        catch (error) {
+
+            setAuthMessage(
+                error.message
+            );
+
+        }
+
+        finally {
+
+            loginButton.disabled =
+                false;
+
+            loginButton.textContent =
+                "Entrar";
+
+        }
+
+    };
+
+
+registerButton.onclick =
+    async () => {
+
+        const username =
+            registerUsername.value.trim();
+
+        const password =
+            registerPassword.value;
+
+        const passwordConfirm =
+            registerPasswordConfirm.value;
+
+
+        if (
+            !username ||
+            !password ||
+            !passwordConfirm
+        ) {
+
+            setAuthMessage(
+                "Preencha todos os campos."
+            );
+
+            return;
+        }
+
+
+        if (
+            password !==
+            passwordConfirm
+        ) {
+
+            setAuthMessage(
+                "As senhas não são iguais."
+            );
+
+            return;
+        }
+
+
+        registerButton.disabled =
+            true;
+
+        registerButton.textContent =
+            "Criando conta...";
+
+        setAuthMessage("");
+
+
+        try {
+
+            const data =
+                await sendAuthRequest(
+                    "/api/auth/register",
+                    {
+                        username,
+                        password
+                    }
+                );
+
+            registerPassword.value =
+                "";
+
+            registerPasswordConfirm.value =
+                "";
+
+            loginIdentifier.value =
+                data.user.username;
+
+            showLoginForm();
+
+            setAuthMessage(
+                "Conta criada! Seu ID é " +
+                data.user.ksfId +
+                ". Agora entre com sua senha.",
+                true
+            );
+
+        }
+
+        catch (error) {
+
+            setAuthMessage(
+                error.message
+            );
+
+        }
+
+        finally {
+
+            registerButton.disabled =
+                false;
+
+            registerButton.textContent =
+                "Criar conta";
+
+        }
+
+    };
+
+
+loginPassword.addEventListener(
+    "keydown",
+    event => {
+
+        if (event.key === "Enter") {
+            loginButton.click();
+        }
+
+    }
+);
+
+
+registerPasswordConfirm.addEventListener(
+    "keydown",
+    event => {
+
+        if (event.key === "Enter") {
+            registerButton.click();
+        }
+
+    }
+);
+
+
+restoreKsfSession();
 
 
 /*
