@@ -377,6 +377,51 @@
             font-size: 14px;
         }
 
+
+        .first-use-note {
+            width: 100%;
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 13px;
+            background: rgba(79, 140, 255, 0.07);
+            border: 1px solid rgba(79, 140, 255, 0.14);
+            color: #c8d9fa;
+            font-size: 13px;
+        }
+
+        .first-use-note a {
+            color: #8eb7ff;
+            font-weight: 800;
+            text-decoration: underline;
+        }
+
+        .important-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+        }
+
+        .important-card {
+            padding: 27px;
+            border-radius: 18px;
+            background: var(--card);
+            border: 1px solid rgba(240, 199, 94, 0.16);
+        }
+
+        .important-card h3 {
+            margin-bottom: 10px;
+            font-size: 19px;
+        }
+
+        .important-card p {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .important-card strong {
+            color: #f5f7ff;
+        }
+
         /* INSTALAÇÃO */
 
         .steps {
@@ -655,7 +700,8 @@
                 width: 100%;
             }
 
-            .features {
+            .features,
+            .important-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -745,6 +791,7 @@
 
         <nav class="nav-links">
             <a href="#recursos">Recursos</a>
+            <a href="#importante">Importante</a>
             <a href="#instalacao">Instalação</a>
             <a href="#atualizacoes">Atualizações</a>
             <a href="#conta">Conta</a>
@@ -786,6 +833,13 @@
                     <div class="version-info">
                         <strong id="versionText">Buscando versão mais recente...</strong>
                         Windows 10 / 11
+                    </div>
+
+                    <div class="first-use-note">
+                        <strong>Primeira vez usando o KSF Screen?</strong><br>
+                        Recomendamos ler as instruções antes de baixar. Elas explicam a instalação,
+                        o aviso do Windows e informações importantes sobre a transmissão de tela e áudio.
+                        <a href="#instalacao">Ler as instruções primeiro</a>.
                     </div>
 
                 </div>
@@ -866,6 +920,49 @@
                     <h3>Conta KSF</h3>
                     <p>
                         Crie sua conta e receba um ID KSF permanente para acessar o aplicativo.
+                    </p>
+                </div>
+
+            </div>
+
+        </div>
+    </section>
+
+    <!-- INFORMAÇÕES IMPORTANTES -->
+
+    <section id="importante">
+        <div class="container">
+
+            <div class="section-header">
+                <div class="section-label">Importante</div>
+
+                <h2>Antes de iniciar uma transmissão.</h2>
+
+                <p>
+                    Confira estas informações para evitar dúvidas durante o uso do KSF Screen.
+                </p>
+            </div>
+
+            <div class="important-grid">
+
+                <div class="important-card">
+                    <h3>Janela minimizada</h3>
+                    <p>
+                        O KSF Screen consegue encontrar uma janela mesmo quando ela está minimizada,
+                        mas a imagem da transmissão não será atualizada enquanto essa janela permanecer
+                        minimizada. Para transmitir normalmente, mantenha a janela aberta. Ela pode ficar
+                        atrás de outras janelas, mas não deve permanecer minimizada.
+                    </p>
+                </div>
+
+                <div class="important-card">
+                    <h3>Tela Geral e áudio de outros aplicativos</h3>
+                    <p>
+                        Ao compartilhar a <strong>Tela Geral</strong>, todo o áudio reproduzido no computador
+                        poderá fazer parte da transmissão. Se você estiver em uma chamada no Discord ou em
+                        outro aplicativo de comunicação, a voz das outras pessoas também poderá ser enviada,
+                        fazendo com que elas se escutem novamente. Uma atualização futura do KSF Screen
+                        permitirá mutar aplicativos específicos da transmissão.
                     </p>
                 </div>
 
