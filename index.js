@@ -97,6 +97,109 @@ let mainWindow = null;
 let updateCheckMode = "manual";
 let automaticUpdateCheckTimer = null;
 
+/*
+================================
+PRESENÇA ONLINE KSF
+================================
+*/
+
+let ksfPresenceHeartbeatTimer = null;
+
+const KSF_PRESENCE_HEARTBEAT_MS =
+    45 * 1000;
+
+
+function stopKsfPresenceHeartbeat() {
+
+    if (ksfPresenceHeartbeatTimer) {
+
+        clearInterval(
+            ksfPresenceHeartbeatTimer
+        );
+
+        ksfPresenceHeartbeatTimer =
+            null;
+
+    }
+}
+
+
+async function sendKsfPresenceHeartbeat() {
+
+    if (
+        !mainWindow ||
+        mainWindow.isDestroyed() ||
+        mainWindow.webContents.isDestroyed()
+    ) {
+
+        return;
+
+    }
+
+
+    try {
+
+        await mainWindow.webContents
+            .executeJavaScript(
+                `
+                (async () => {
+                    const token =
+                        localStorage.getItem(
+                            "ksfAuthToken"
+                        );
+
+                    if (!token) {
+                        return false;
+                    }
+
+                    try {
+                        const response =
+                            await fetch(
+                                "https://ksf-screen.onrender.com/api/auth/me",
+                                {
+                                    method: "GET",
+                                    headers: {
+                                        "Authorization":
+                                            "Bearer " + token
+                                    }
+                                }
+                            );
+
+                        return response.ok;
+                    }
+                    catch (error) {
+                        return false;
+                    }
+                })();
+                `,
+                true
+            );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Erro no heartbeat de presença KSF:",
+            error
+        );
+
+    }
+}
+
+
+function startKsfPresenceHeartbeat() {
+
+    stopKsfPresenceHeartbeat();
+
+    sendKsfPresenceHeartbeat();
+
+    ksfPresenceHeartbeatTimer =
+        setInterval(
+            sendKsfPresenceHeartbeat,
+            KSF_PRESENCE_HEARTBEAT_MS
+        );
+}
+
 
 /*
 ================================
@@ -308,6 +411,8 @@ function createWindow() {
         () => {
 
             scheduleCaptureCompatibility();
+
+            startKsfPresenceHeartbeat();
 
         }
     );
@@ -2120,6 +2225,8 @@ app.on(
                 null;
 
         }
+
+        stopKsfPresenceHeartbeat();
 
         stopNativeAudioCapture();
 
