@@ -1522,6 +1522,9 @@
     </div>
 
     <script>
+        const API_BASE = "https://ksf-screen.onrender.com";
+        const TOKEN_KEY = "ksf_admin_token";
+
         const loginScreen =
             document.getElementById("loginScreen");
 
@@ -1533,6 +1536,15 @@
 
         const loginMessage =
             document.getElementById("loginMessage");
+
+        const loginButton =
+            document.getElementById("loginButton");
+
+        const adminLogin =
+            document.getElementById("adminLogin");
+
+        const adminPassword =
+            document.getElementById("adminPassword");
 
         const logoutButton =
             document.getElementById("logoutButton");
@@ -1555,23 +1567,140 @@
         const pages =
             document.querySelectorAll(".page");
 
-        /*
-            O login real será conectado ao servidor
-            do KSF Screen na próxima etapa.
+        const refreshButton =
+            document.getElementById("refreshButton");
 
-            Não existe usuário ou senha de administrador
-            gravado neste HTML.
-        */
+        const userSearch =
+            document.getElementById("userSearch");
+
+        function getToken() {
+            return sessionStorage.getItem(TOKEN_KEY) || "";
+        }
+
+        function setToken(token) {
+            if (token) {
+                sessionStorage.setItem(TOKEN_KEY, token);
+            } else {
+                sessionStorage.removeItem(TOKEN_KEY);
+            }
+        }
+
+        async function apiRequest(path, options = {}) {
+            const headers = {
+                "Content-Type": "application/json",
+                ...(options.headers || {})
+            };
+
+            const token = getToken();
+
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+
+            const response = await fetch(
+                `${API_BASE}${path}`,
+                {
+                    ...options,
+                    headers
+                }
+            );
+
+            let data = null;
+
+            try {
+                data = await response.json();
+            } catch {
+                data = {};
+            }
+
+            if (response.status === 401) {
+                setToken("");
+            }
+
+            if (!response.ok) {
+                const error = new Error(
+                    data?.message ||
+                    "Não foi possível concluir a solicitação."
+                );
+
+                error.status = response.status;
+                throw error;
+            }
+
+            return data;
+        }
+
+        function mostrarMensagemLogin(message) {
+            loginMessage.textContent = message;
+            loginMessage.style.display = "block";
+        }
+
+        function esconderMensagemLogin() {
+            loginMessage.textContent = "";
+            loginMessage.style.display = "none";
+        }
+
+        function mostrarLogin() {
+            dashboard.style.display = "none";
+            loginScreen.style.display = "flex";
+            adminPassword.value = "";
+        }
+
+        function mostrarPainel() {
+            loginScreen.style.display = "none";
+            dashboard.style.display = "block";
+        }
 
         loginForm.addEventListener(
             "submit",
-            function(event) {
+            async function(event) {
                 event.preventDefault();
+                esconderMensagemLogin();
 
-                loginMessage.style.display = "block";
+                const username =
+                    adminLogin.value.trim();
 
-                loginMessage.textContent =
-                    "O login administrativo ainda não foi conectado ao servidor.";
+                const password =
+                    adminPassword.value;
+
+                loginButton.disabled = true;
+                loginButton.style.opacity = "0.7";
+                loginButton.textContent = "Entrando...";
+
+                try {
+                    const data =
+                        await apiRequest(
+                            "/api/admin/login",
+                            {
+                                method: "POST",
+                                body: JSON.stringify({
+                                    username,
+                                    password
+                                })
+                            }
+                        );
+
+                    if (!data?.token) {
+                        throw new Error(
+                            "O servidor não retornou uma sessão administrativa."
+                        );
+                    }
+
+                    setToken(data.token);
+                    adminPassword.value = "";
+
+                    mostrarPainel();
+                    await carregarTudo();
+                } catch (error) {
+                    mostrarMensagemLogin(
+                        error.message ||
+                        "Não foi possível entrar no painel."
+                    );
+                } finally {
+                    loginButton.disabled = false;
+                    loginButton.style.opacity = "1";
+                    loginButton.textContent = "Entrar no painel";
+                }
             }
         );
 
@@ -1605,6 +1734,10 @@
             if (pageName === "users") {
                 topbarTitle.textContent =
                     "Contas KSF";
+
+                carregarUsuarios(
+                    userSearch.value.trim()
+                );
             } else {
                 topbarTitle.textContent =
                     "Visão geral";
@@ -1646,25 +1779,25 @@
 
         logoutButton.addEventListener(
             "click",
-            function() {
-                dashboard.style.display = "none";
-                loginScreen.style.display = "flex";
-
-                document.getElementById(
-                    "adminPassword"
-                ).value = "";
+            async function() {
+                try {
+                    if (getToken()) {
+                        await apiRequest(
+                            "/api/admin/logout",
+                            {
+                                method: "POST"
+                            }
+                        );
+                    }
+                } catch {
+                    // A sessão será apagada localmente mesmo
+                    // se o servidor já a tiver encerrado.
+                } finally {
+                    setToken("");
+                    mostrarLogin();
+                }
             }
         );
-
-        /*
-            Funções abaixo serão usadas quando
-            conectarmos o painel ao backend.
-        */
-
-        function mostrarPainel() {
-            loginScreen.style.display = "none";
-            dashboard.style.display = "block";
-        }
 
         function formatarData(data) {
             if (!data) {
@@ -1695,6 +1828,304 @@
                 .replaceAll('"', "&quot;")
                 .replaceAll("'", "&#039;");
         }
+
+        function statusHTML(status) {
+            const online =
+                status === "online";
+
+            return `
+                <span class="status ${
+                    online
+                    ? "status-online"
+                    : "status-offline"
+                }">
+                    ${online ? "● Online" : "● Offline"}
+                </span>
+            `;
+        }
+
+        function preencherTabela(
+            tbody,
+            users,
+            emptyMessage
+        ) {
+            if (
+                !Array.isArray(users) ||
+                users.length === 0
+            ) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td
+                            colspan="4"
+                            class="empty-row"
+                        >
+                            ${escaparHTML(emptyMessage)}
+                        </td>
+                    </tr>
+                `;
+
+                return;
+            }
+
+            tbody.innerHTML =
+                users.map(user => `
+                    <tr>
+                        <td class="id-value">
+                            ${escaparHTML(user.ksfId || "—")}
+                        </td>
+
+                        <td>
+                            ${statusHTML(user.status)}
+                        </td>
+
+                        <td>
+                            ${escaparHTML(
+                                formatarData(user.createdAt)
+                            )}
+                        </td>
+
+                        <td>
+                            ${escaparHTML(
+                                formatarData(user.lastAccess)
+                            )}
+                        </td>
+                    </tr>
+                `).join("");
+        }
+
+        function setServerIndicator(
+            online,
+            text
+        ) {
+            const serverDot =
+                document.getElementById("serverDot");
+
+            const serverStatus =
+                document.getElementById("serverStatus");
+
+            serverDot.style.background =
+                online
+                ? "#45d483"
+                : "#ff667d";
+
+            serverStatus.textContent =
+                text;
+        }
+
+        async function carregarDashboard() {
+            try {
+                const data =
+                    await apiRequest(
+                        "/api/admin/dashboard"
+                    );
+
+                const stats =
+                    data.stats || {};
+
+                const services =
+                    data.services || {};
+
+                document.getElementById(
+                    "totalAccounts"
+                ).textContent =
+                    stats.totalAccounts ?? 0;
+
+                document.getElementById(
+                    "onlineNow"
+                ).textContent =
+                    stats.onlineNow ?? 0;
+
+                document.getElementById(
+                    "newToday"
+                ).textContent =
+                    stats.newToday ?? 0;
+
+                document.getElementById(
+                    "currentVersion"
+                ).textContent =
+                    stats.currentVersion || "—";
+
+                document.getElementById(
+                    "backendStatus"
+                ).textContent =
+                    services.backend === "online"
+                    ? "Online"
+                    : "Indisponível";
+
+                document.getElementById(
+                    "databaseStatus"
+                ).textContent =
+                    services.database === "online"
+                    ? "Online"
+                    : "Indisponível";
+
+                document.getElementById(
+                    "multistreamStatus"
+                ).textContent =
+                    services.multistream === "active"
+                    ? "Ativo"
+                    : "Indisponível";
+
+                document.getElementById(
+                    "lastUpdate"
+                ).textContent =
+                    formatarData(data.updatedAt);
+
+                preencherTabela(
+                    document.getElementById(
+                        "recentUsers"
+                    ),
+                    data.recentAccounts,
+                    "Nenhuma conta cadastrada."
+                );
+
+                document.getElementById(
+                    "chartArea"
+                ).innerHTML = `
+                    <strong>Dados conectados</strong>
+                    O histórico diário do gráfico será
+                    adicionado em uma próxima etapa.
+                `;
+
+                setServerIndicator(
+                    true,
+                    "Servidor online"
+                );
+            } catch (error) {
+                if (error.status === 401) {
+                    setToken("");
+                    mostrarLogin();
+                    mostrarMensagemLogin(
+                        "Sua sessão expirou. Entre novamente."
+                    );
+                    return;
+                }
+
+                setServerIndicator(
+                    false,
+                    "Servidor indisponível"
+                );
+
+                document.getElementById(
+                    "backendStatus"
+                ).textContent =
+                    "Indisponível";
+            }
+        }
+
+        async function carregarUsuarios(
+            search = ""
+        ) {
+            const tbody =
+                document.getElementById(
+                    "usersTable"
+                );
+
+            tbody.innerHTML = `
+                <tr>
+                    <td
+                        colspan="4"
+                        class="empty-row"
+                    >
+                        Carregando...
+                    </td>
+                </tr>
+            `;
+
+            try {
+                const query =
+                    search
+                    ? `?search=${encodeURIComponent(search)}`
+                    : "";
+
+                const data =
+                    await apiRequest(
+                        `/api/admin/users${query}`
+                    );
+
+                preencherTabela(
+                    tbody,
+                    data.users,
+                    search
+                    ? "Nenhum ID KSF encontrado."
+                    : "Nenhuma conta cadastrada."
+                );
+            } catch (error) {
+                if (error.status === 401) {
+                    setToken("");
+                    mostrarLogin();
+                    mostrarMensagemLogin(
+                        "Sua sessão expirou. Entre novamente."
+                    );
+                    return;
+                }
+
+                tbody.innerHTML = `
+                    <tr>
+                        <td
+                            colspan="4"
+                            class="empty-row"
+                        >
+                            Não foi possível carregar as contas.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        async function carregarTudo() {
+            await Promise.all([
+                carregarDashboard(),
+                carregarUsuarios(
+                    userSearch.value.trim()
+                )
+            ]);
+        }
+
+        refreshButton.addEventListener(
+            "click",
+            carregarTudo
+        );
+
+        let searchTimer = null;
+
+        userSearch.addEventListener(
+            "input",
+            function() {
+                clearTimeout(searchTimer);
+
+                searchTimer =
+                    setTimeout(
+                        () => {
+                            carregarUsuarios(
+                                userSearch.value.trim()
+                            );
+                        },
+                        300
+                    );
+            }
+        );
+
+        async function restaurarSessao() {
+            if (!getToken()) {
+                mostrarLogin();
+                return;
+            }
+
+            try {
+                await apiRequest(
+                    "/api/admin/me"
+                );
+
+                mostrarPainel();
+                await carregarTudo();
+            } catch {
+                setToken("");
+                mostrarLogin();
+            }
+        }
+
+        restaurarSessao();
     </script>
 
 </body>
