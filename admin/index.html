@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>KSF Screen — Painel Admin</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #050914;
+            --sidebar: #080e1b;
+            --card: rgba(15, 25, 45, 0.88);
+            --card-hover: rgba(20, 33, 58, 0.95);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #f5f7ff;
+            --muted: #8f9db7;
+            --blue: #4f8cff;
+            --blue-light: #79aaff;
+            --green: #45d483;
+            --yellow: #f0c75e;
+            --red: #ff667d;
+            --shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(
+                    circle at 80% 0%,
+                    rgba(79, 140, 255, 0.08),
+                    transparent 30%
+                ),
+                var(--bg);
+
+            color: var(--text);
+            font-family: "Segoe UI", Arial, sans-serif;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* LOGIN */
+
+        .login-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 25px;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 430px;
+            padding: 36px;
+            border-radius: 24px;
+
+            background:
+                radial-gradient(
+                    circle at 100% 0%,
+                    rgba(79, 140, 255, 0.13),
+                    transparent 35%
+                ),
+                rgba(12, 21, 39, 0.96);
+
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .login-brand {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            margin-bottom: 30px;
+        }
+
+        .brand-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 13px;
+
+            display: grid;
+            place-items: center;
+
+            background: linear-gradient(
+                135deg,
+                #4f8cff,
+                #7158ff
+            );
+
+            box-shadow:
+                0 10px 30px rgba(79, 140, 255, 0.28);
+
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .login-brand-text strong {
+            display: block;
+            font-size: 18px;
+        }
+
+        .login-brand-text span {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .login-card h1 {
+            font-size: 30px;
+            letter-spacing: -1px;
+            margin-bottom: 8px;
+        }
+
+        .login-description {
+            color: var(--muted);
+            font-size: 14px;
+            margin-bottom: 27px;
+        }
+
+        .field {
+            margin-bottom: 17px;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 7px;
+            color: #c8d3e8;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .field input {
+            width: 100%;
+            height: 49px;
+
+            padding: 0 14px;
+
+            border-radius: 11px;
+            border: 1px solid var(--border);
+
+            outline: none;
+
+            background: rgba(5, 9, 20, 0.72);
+            color: white;
+
+            transition:
+                border-color 0.2s,
+                box-shadow 0.2s;
+        }
+
+        .field input:focus {
+            border-color: rgba(79, 140, 255, 0.65);
+
+            box-shadow:
+                0 0 0 3px rgba(79, 140, 255, 0.09);
+        }
+
+        .login-button {
+            width: 100%;
+            height: 50px;
+
+            margin-top: 5px;
+
+            border: 0;
+            border-radius: 12px;
+
+            cursor: pointer;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #4f8cff,
+                    #6678ff
+                );
+
+            color: white;
+
+            font-weight: 800;
+
+            box-shadow:
+                0 12px 30px rgba(79, 140, 255, 0.22);
+
+            transition:
+                transform 0.2s,
+                opacity 0.2s;
+        }
+
+        .login-button:hover {
+            transform: translateY(-1px);
+        }
+
+        .login-message {
+            display: none;
+
+            margin-top: 15px;
+            padding: 11px 13px;
+
+            border-radius: 10px;
+
+            background: rgba(255, 102, 125, 0.08);
+            border: 1px solid rgba(255, 102, 125, 0.16);
+
+            color: #ff9cab;
+
+            font-size: 13px;
+        }
+
+        .login-security {
+            margin-top: 23px;
+            padding-top: 20px;
+
+            border-top:
+                1px solid rgba(255, 255, 255, 0.06);
+
+            color: var(--muted);
+
+            text-align: center;
+            font-size: 12px;
+        }
+
+        /* PAINEL */
+
+        .dashboard {
+            display: none;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+
+            width: 245px;
+
+            padding: 22px 16px;
+
+            background:
+                rgba(7, 13, 25, 0.97);
+
+            border-right:
+                1px solid rgba(255, 255, 255, 0.06);
+
+            z-index: 30;
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+
+            padding: 4px 7px 25px;
+        }
+
+        .sidebar-brand .brand-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            font-size: 12px;
+        }
+
+        .sidebar-brand strong {
+            display: block;
+            font-size: 16px;
+        }
+
+        .sidebar-brand span {
+            display: block;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .nav-title {
+            padding: 8px 10px;
+
+            color: #63708a;
+
+            font-size: 10px;
+            font-weight: 800;
+
+            text-transform: uppercase;
+            letter-spacing: 1.3px;
+        }
+
+        .nav-menu {
+            display: grid;
+            gap: 5px;
+        }
+
+        .nav-item {
+            width: 100%;
+            min-height: 43px;
+
+            display: flex;
+            align-items: center;
+            gap: 12px;
+
+            padding: 0 12px;
+
+            border: 0;
+            border-radius: 10px;
+
+            cursor: pointer;
+
+            background: transparent;
+            color: var(--muted);
+
+            text-align: left;
+
+            font-size: 13px;
+            font-weight: 650;
+
+            transition:
+                background 0.2s,
+                color 0.2s;
+        }
+
+        .nav-item:hover {
+            background:
+                rgba(255, 255, 255, 0.04);
+
+            color: white;
+        }
+
+        .nav-item.active {
+            background:
+                rgba(79, 140, 255, 0.11);
+
+            color: #8eb7ff;
+        }
+
+        .nav-icon {
+            width: 23px;
+            text-align: center;
+            font-size: 15px;
+        }
+
+        .sidebar-bottom {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 20px;
+        }
+
+        .admin-small {
+            padding: 13px;
+
+            border-radius: 12px;
+
+            background:
+                rgba(255, 255, 255, 0.025);
+
+            border: 1px solid var(--border);
+
+            margin-bottom: 10px;
+        }
+
+        .admin-small strong {
+            display: block;
+            font-size: 12px;
+        }
+
+        .admin-small span {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .logout-button {
+            width: 100%;
+            height: 39px;
+
+            border: 1px solid var(--border);
+            border-radius: 9px;
+
+            background: transparent;
+            color: #b7c2d5;
+
+            cursor: pointer;
+
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .logout-button:hover {
+            color: white;
+            background:
+                rgba(255, 255, 255, 0.04);
+        }
+
+        /* CONTEÚDO */
+
+        .main {
+            margin-left: 245px;
+            min-height: 100vh;
+        }
+
+        .topbar {
+            min-height: 78px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 20px;
+
+            padding: 0 30px;
+
+            border-bottom:
+                1px solid rgba(255, 255, 255, 0.06);
+
+            background:
+                rgba(5, 9, 20, 0.72);
+
+            backdrop-filter: blur(15px);
+
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .menu-button {
+            display: none;
+
+            width: 40px;
+            height: 40px;
+
+            border-radius: 10px;
+            border: 1px solid var(--border);
+
+            background:
+                rgba(255, 255, 255, 0.03);
+
+            color: white;
+
+            cursor: pointer;
+
+            font-size: 18px;
+        }
+
+        .topbar h1 {
+            font-size: 20px;
+            letter-spacing: -0.4px;
+        }
+
+        .topbar p {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .server-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            padding: 8px 12px;
+
+            border-radius: 999px;
+
+            background:
+                rgba(255, 255, 255, 0.035);
+
+            border: 1px solid var(--border);
+
+            color: var(--muted);
+
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .server-dot {
+            width: 8px;
+            height: 8px;
+
+            border-radius: 50%;
+
+            background: #657086;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+
+            gap: 20px;
+
+            margin-bottom: 25px;
+        }
+
+        .page-header h2 {
+            font-size: 27px;
+            letter-spacing: -0.8px;
+            margin-bottom: 4px;
+        }
+
+        .page-header p {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .refresh-button {
+            height: 39px;
+
+            padding: 0 15px;
+
+            border-radius: 10px;
+            border: 1px solid var(--border);
+
+            background:
+                rgba(255, 255, 255, 0.035);
+
+            color: #cbd5e7;
+
+            cursor: pointer;
+
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .refresh-button:hover {
+            background:
+                rgba(255, 255, 255, 0.06);
+
+            color: white;
+        }
+
+        /* CARDS */
+
+        .stats-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
+
+            gap: 16px;
+
+            margin-bottom: 22px;
+        }
+
+        .stat-card {
+            min-height: 130px;
+
+            padding: 20px;
+
+            border-radius: 16px;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(17, 29, 51, 0.9),
+                    rgba(10, 18, 34, 0.9)
+                );
+
+            border: 1px solid var(--border);
+
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: "";
+
+            position: absolute;
+
+            width: 80px;
+            height: 80px;
+
+            right: -20px;
+            top: -25px;
+
+            border-radius: 50%;
+
+            background:
+                rgba(79, 140, 255, 0.08);
+
+            filter: blur(10px);
+        }
+
+        .stat-label {
+            color: var(--muted);
+
+            font-size: 11px;
+            font-weight: 700;
+
+            margin-bottom: 13px;
+        }
+
+        .stat-value {
+            font-size: 31px;
+            font-weight: 850;
+            letter-spacing: -1px;
+
+            margin-bottom: 4px;
+        }
+
+        .stat-detail {
+            color: #6f7e99;
+            font-size: 10px;
+        }
+
+        .green-text {
+            color: var(--green);
+        }
+
+        .yellow-text {
+            color: var(--yellow);
+        }
+
+        .blue-text {
+            color: var(--blue-light);
+        }
+
+        /* PAINÉIS */
+
+        .dashboard-grid {
+            display: grid;
+
+            grid-template-columns:
+                minmax(0, 1.55fr)
+                minmax(300px, 0.7fr);
+
+            gap: 17px;
+        }
+
+        .panel {
+            border-radius: 17px;
+
+            background: var(--card);
+
+            border: 1px solid var(--border);
+
+            overflow: hidden;
+        }
+
+        .panel-header {
+            min-height: 62px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 15px;
+
+            padding: 0 20px;
+
+            border-bottom:
+                1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .panel-header h3 {
+            font-size: 14px;
+        }
+
+        .panel-header span {
+            color: var(--muted);
+            font-size: 10px;
+        }
+
+        /* GRÁFICO */
+
+        .chart-area {
+            height: 275px;
+            padding: 25px 20px 20px;
+
+            position: relative;
+        }
+
+        .chart-empty {
+            height: 100%;
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 12px;
+
+            background:
+                linear-gradient(
+                    180deg,
+                    rgba(79, 140, 255, 0.025),
+                    transparent
+                );
+
+            color: #64718a;
+
+            text-align: center;
+
+            font-size: 12px;
+        }
+
+        .chart-empty strong {
+            display: block;
+            color: #aab6ca;
+            margin-bottom: 4px;
+        }
+
+        /* SERVIDOR */
+
+        .server-list {
+            padding: 8px 20px 17px;
+        }
+
+        .server-row {
+            min-height: 54px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 15px;
+
+            border-bottom:
+                1px solid rgba(255, 255, 255, 0.05);
+
+            font-size: 12px;
+        }
+
+        .server-row:last-child {
+            border-bottom: 0;
+        }
+
+        .server-name {
+            color: var(--muted);
+        }
+
+        .server-value {
+            color: #cbd5e7;
+            font-weight: 700;
+            text-align: right;
+        }
+
+        /* TABELA */
+
+        .table-panel {
+            margin-top: 17px;
+        }
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 650px;
+        }
+
+        th {
+            padding: 13px 20px;
+
+            color: #687791;
+
+            font-size: 10px;
+            font-weight: 800;
+
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+
+            text-align: left;
+
+            background:
+                rgba(255, 255, 255, 0.015);
+        }
+
+        td {
+            padding: 15px 20px;
+
+            border-top:
+                1px solid rgba(255, 255, 255, 0.05);
+
+            color: #c8d2e5;
+
+            font-size: 12px;
+        }
+
+        .id-value {
+            color: #8eb7ff;
+            font-weight: 800;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+
+            padding: 5px 9px;
+
+            border-radius: 999px;
+
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .status-online {
+            color: #69e49b;
+            background:
+                rgba(69, 212, 131, 0.09);
+        }
+
+        .status-offline {
+            color: #8d99ad;
+            background:
+                rgba(255, 255, 255, 0.04);
+        }
+
+        .empty-row {
+            height: 100px;
+            text-align: center;
+            color: #65728a;
+        }
+
+        /* USUÁRIOS */
+
+        .users-card {
+            border-radius: 17px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .users-toolbar {
+            padding: 17px 20px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 15px;
+
+            border-bottom:
+                1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .users-toolbar h3 {
+            font-size: 14px;
+        }
+
+        .search-input {
+            width: min(270px, 100%);
+            height: 38px;
+
+            padding: 0 12px;
+
+            border-radius: 9px;
+            border: 1px solid var(--border);
+
+            outline: none;
+
+            background:
+                rgba(5, 9, 20, 0.6);
+
+            color: white;
+
+            font-size: 12px;
+        }
+
+        .search-input:focus {
+            border-color:
+                rgba(79, 140, 255, 0.55);
+        }
+
+        /* MOBILE */
+
+        .sidebar-overlay {
+            display: none;
+
+            position: fixed;
+            inset: 0;
+
+            z-index: 25;
+
+            background:
+                rgba(0, 0, 0, 0.55);
+        }
+
+        @media (max-width: 1100px) {
+            .stats-grid {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 800px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.25s;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .sidebar-overlay.show {
+                display: block;
+            }
+
+            .main {
+                margin-left: 0;
+            }
+
+            .menu-button {
+                display: grid;
+                place-items: center;
+            }
+
+            .topbar {
+                padding: 0 18px;
+            }
+
+            .content {
+                padding: 22px 16px;
+            }
+        }
+
+        @media (max-width: 560px) {
+            .login-card {
+                padding: 27px 21px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .page-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .refresh-button {
+                width: 100%;
+            }
+
+            .users-toolbar {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .search-input {
+                width: 100%;
+            }
+
+            .server-indicator span:last-child {
+                display: none;
+            }
+
+            .topbar h1 {
+                font-size: 17px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- LOGIN -->
+
+    <div class="login-screen" id="loginScreen">
+
+        <div class="login-card">
+
+            <div class="login-brand">
+                <div class="brand-icon">KSF</div>
+
+                <div class="login-brand-text">
+                    <strong>KSF Screen</strong>
+                    <span>Painel administrativo</span>
+                </div>
+            </div>
+
+            <h1>Acesso Admin</h1>
+
+            <p class="login-description">
+                Entre com sua conta administrativa para acessar
+                as informações do KSF Screen.
+            </p>
+
+            <form id="loginForm">
+
+                <div class="field">
+                    <label for="adminLogin">
+                        Usuário
+                    </label>
+
+                    <input
+                        type="text"
+                        id="adminLogin"
+                        autocomplete="username"
+                        placeholder="Usuário administrativo"
+                        required
+                    >
+                </div>
+
+                <div class="field">
+                    <label for="adminPassword">
+                        Senha
+                    </label>
+
+                    <input
+                        type="password"
+                        id="adminPassword"
+                        autocomplete="current-password"
+                        placeholder="Sua senha"
+                        required
+                    >
+                </div>
+
+                <button
+                    type="submit"
+                    class="login-button"
+                    id="loginButton"
+                >
+                    Entrar no painel
+                </button>
+
+                <div
+                    class="login-message"
+                    id="loginMessage"
+                ></div>
+
+            </form>
+
+            <div class="login-security">
+                Acesso restrito ao administrador do KSF Screen.
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- DASHBOARD -->
+
+    <div class="dashboard" id="dashboard">
+
+        <div
+            class="sidebar-overlay"
+            id="sidebarOverlay"
+        ></div>
+
+        <aside class="sidebar" id="sidebar">
+
+            <div class="sidebar-brand">
+
+                <div class="brand-icon">
+                    KSF
+                </div>
+
+                <div>
+                    <strong>KSF Screen</strong>
+                    <span>Admin</span>
+                </div>
+
+            </div>
+
+            <div class="nav-title">
+                Painel
+            </div>
+
+            <div class="nav-menu">
+
+                <button
+                    class="nav-item active"
+                    data-page="overview"
+                >
+                    <span class="nav-icon">⌂</span>
+                    Visão geral
+                </button>
+
+                <button
+                    class="nav-item"
+                    data-page="users"
+                >
+                    <span class="nav-icon">◎</span>
+                    Contas KSF
+                </button>
+
+            </div>
+
+            <div class="sidebar-bottom">
+
+                <div class="admin-small">
+                    <strong>Administrador</strong>
+                    <span>Acesso privado</span>
+                </div>
+
+                <button
+                    class="logout-button"
+                    id="logoutButton"
+                >
+                    Sair do painel
+                </button>
+
+            </div>
+
+        </aside>
+
+        <div class="main">
+
+            <div class="topbar">
+
+                <div class="topbar-left">
+
+                    <button
+                        class="menu-button"
+                        id="menuButton"
+                    >
+                        ☰
+                    </button>
+
+                    <div>
+                        <h1 id="topbarTitle">
+                            Visão geral
+                        </h1>
+
+                        <p>
+                            KSF Screen — Administração
+                        </p>
+                    </div>
+
+                </div>
+
+                <div class="server-indicator">
+
+                    <div
+                        class="server-dot"
+                        id="serverDot"
+                    ></div>
+
+                    <span id="serverStatus">
+                        Aguardando conexão
+                    </span>
+
+                </div>
+
+            </div>
+
+            <div class="content">
+
+                <!-- VISÃO GERAL -->
+
+                <div
+                    class="page active"
+                    id="page-overview"
+                >
+
+                    <div class="page-header">
+
+                        <div>
+                            <h2>Visão geral</h2>
+
+                            <p>
+                                Acompanhe o estado atual
+                                do KSF Screen.
+                            </p>
+                        </div>
+
+                        <button
+                            class="refresh-button"
+                            id="refreshButton"
+                        >
+                            Atualizar dados
+                        </button>
+
+                    </div>
+
+                    <div class="stats-grid">
+
+                        <div class="stat-card">
+
+                            <div class="stat-label">
+                                CONTAS CADASTRADAS
+                            </div>
+
+                            <div
+                                class="stat-value blue-text"
+                                id="totalAccounts"
+                            >
+                                —
+                            </div>
+
+                            <div class="stat-detail">
+                                Total de IDs KSF
+                            </div>
+
+                        </div>
+
+                        <div class="stat-card">
+
+                            <div class="stat-label">
+                                ONLINE AGORA
+                            </div>
+
+                            <div
+                                class="stat-value green-text"
+                                id="onlineNow"
+                            >
+                                —
+                            </div>
+
+                            <div class="stat-detail">
+                                Usuários conectados
+                            </div>
+
+                        </div>
+
+                        <div class="stat-card">
+
+                            <div class="stat-label">
+                                NOVAS HOJE
+                            </div>
+
+                            <div
+                                class="stat-value"
+                                id="newToday"
+                            >
+                                —
+                            </div>
+
+                            <div class="stat-detail">
+                                Contas criadas hoje
+                            </div>
+
+                        </div>
+
+                        <div class="stat-card">
+
+                            <div class="stat-label">
+                                VERSÃO ATUAL
+                            </div>
+
+                            <div
+                                class="stat-value yellow-text"
+                                id="currentVersion"
+                            >
+                                —
+                            </div>
+
+                            <div class="stat-detail">
+                                Última versão publicada
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="dashboard-grid">
+
+                        <div class="panel">
+
+                            <div class="panel-header">
+
+                                <div>
+                                    <h3>
+                                        Novas contas
+                                    </h3>
+
+                                    <span>
+                                        Últimos 7 dias
+                                    </span>
+                                </div>
+
+                            </div>
+
+                            <div class="chart-area">
+
+                                <div
+                                    class="chart-empty"
+                                    id="chartArea"
+                                >
+                                    <strong>
+                                        Aguardando dados
+                                    </strong>
+
+                                    O gráfico será carregado
+                                    pelo servidor.
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="panel">
+
+                            <div class="panel-header">
+
+                                <div>
+                                    <h3>
+                                        Status do sistema
+                                    </h3>
+
+                                    <span>
+                                        Serviços KSF
+                                    </span>
+                                </div>
+
+                            </div>
+
+                            <div class="server-list">
+
+                                <div class="server-row">
+                                    <span class="server-name">
+                                        Servidor
+                                    </span>
+
+                                    <span
+                                        class="server-value"
+                                        id="backendStatus"
+                                    >
+                                        —
+                                    </span>
+                                </div>
+
+                                <div class="server-row">
+                                    <span class="server-name">
+                                        Banco de dados
+                                    </span>
+
+                                    <span
+                                        class="server-value"
+                                        id="databaseStatus"
+                                    >
+                                        —
+                                    </span>
+                                </div>
+
+                                <div class="server-row">
+                                    <span class="server-name">
+                                        Multi-Stream
+                                    </span>
+
+                                    <span
+                                        class="server-value"
+                                        id="multistreamStatus"
+                                    >
+                                        —
+                                    </span>
+                                </div>
+
+                                <div class="server-row">
+                                    <span class="server-name">
+                                        Última atualização
+                                    </span>
+
+                                    <span
+                                        class="server-value"
+                                        id="lastUpdate"
+                                    >
+                                        —
+                                    </span>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="panel table-panel">
+
+                        <div class="panel-header">
+
+                            <div>
+                                <h3>
+                                    Contas recentes
+                                </h3>
+
+                                <span>
+                                    Últimos cadastros
+                                </span>
+                            </div>
+
+                        </div>
+
+                        <div class="table-wrap">
+
+                            <table>
+
+                                <thead>
+                                    <tr>
+                                        <th>ID KSF</th>
+                                        <th>Status</th>
+                                        <th>Cadastro</th>
+                                        <th>Último acesso</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody id="recentUsers">
+
+                                    <tr>
+                                        <td
+                                            colspan="4"
+                                            class="empty-row"
+                                        >
+                                            Aguardando dados do servidor.
+                                        </td>
+                                    </tr>
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- CONTAS -->
+
+                <div
+                    class="page"
+                    id="page-users"
+                >
+
+                    <div class="page-header">
+
+                        <div>
+                            <h2>Contas KSF</h2>
+
+                            <p>
+                                Consulte os IDs cadastrados
+                                no KSF Screen.
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <div class="users-card">
+
+                        <div class="users-toolbar">
+
+                            <h3>
+                                Usuários cadastrados
+                            </h3>
+
+                            <input
+                                type="text"
+                                class="search-input"
+                                id="userSearch"
+                                placeholder="Buscar por ID KSF..."
+                            >
+
+                        </div>
+
+                        <div class="table-wrap">
+
+                            <table>
+
+                                <thead>
+                                    <tr>
+                                        <th>ID KSF</th>
+                                        <th>Status</th>
+                                        <th>Cadastro</th>
+                                        <th>Último acesso</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody id="usersTable">
+
+                                    <tr>
+                                        <td
+                                            colspan="4"
+                                            class="empty-row"
+                                        >
+                                            Aguardando dados do servidor.
+                                        </td>
+                                    </tr>
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        const loginScreen =
+            document.getElementById("loginScreen");
+
+        const dashboard =
+            document.getElementById("dashboard");
+
+        const loginForm =
+            document.getElementById("loginForm");
+
+        const loginMessage =
+            document.getElementById("loginMessage");
+
+        const logoutButton =
+            document.getElementById("logoutButton");
+
+        const menuButton =
+            document.getElementById("menuButton");
+
+        const sidebar =
+            document.getElementById("sidebar");
+
+        const sidebarOverlay =
+            document.getElementById("sidebarOverlay");
+
+        const topbarTitle =
+            document.getElementById("topbarTitle");
+
+        const navItems =
+            document.querySelectorAll(".nav-item");
+
+        const pages =
+            document.querySelectorAll(".page");
+
+        /*
+            O login real será conectado ao servidor
+            do KSF Screen na próxima etapa.
+
+            Não existe usuário ou senha de administrador
+            gravado neste HTML.
+        */
+
+        loginForm.addEventListener(
+            "submit",
+            function(event) {
+                event.preventDefault();
+
+                loginMessage.style.display = "block";
+
+                loginMessage.textContent =
+                    "O login administrativo ainda não foi conectado ao servidor.";
+            }
+        );
+
+        function abrirPagina(pageName) {
+            pages.forEach(page => {
+                page.classList.remove("active");
+            });
+
+            navItems.forEach(item => {
+                item.classList.remove("active");
+            });
+
+            const selectedPage =
+                document.getElementById(
+                    `page-${pageName}`
+                );
+
+            const selectedButton =
+                document.querySelector(
+                    `[data-page="${pageName}"]`
+                );
+
+            if (selectedPage) {
+                selectedPage.classList.add("active");
+            }
+
+            if (selectedButton) {
+                selectedButton.classList.add("active");
+            }
+
+            if (pageName === "users") {
+                topbarTitle.textContent =
+                    "Contas KSF";
+            } else {
+                topbarTitle.textContent =
+                    "Visão geral";
+            }
+
+            fecharMenuMobile();
+        }
+
+        navItems.forEach(item => {
+            item.addEventListener(
+                "click",
+                function() {
+                    abrirPagina(
+                        this.dataset.page
+                    );
+                }
+            );
+        });
+
+        function abrirMenuMobile() {
+            sidebar.classList.add("open");
+            sidebarOverlay.classList.add("show");
+        }
+
+        function fecharMenuMobile() {
+            sidebar.classList.remove("open");
+            sidebarOverlay.classList.remove("show");
+        }
+
+        menuButton.addEventListener(
+            "click",
+            abrirMenuMobile
+        );
+
+        sidebarOverlay.addEventListener(
+            "click",
+            fecharMenuMobile
+        );
+
+        logoutButton.addEventListener(
+            "click",
+            function() {
+                dashboard.style.display = "none";
+                loginScreen.style.display = "flex";
+
+                document.getElementById(
+                    "adminPassword"
+                ).value = "";
+            }
+        );
+
+        /*
+            Funções abaixo serão usadas quando
+            conectarmos o painel ao backend.
+        */
+
+        function mostrarPainel() {
+            loginScreen.style.display = "none";
+            dashboard.style.display = "block";
+        }
+
+        function formatarData(data) {
+            if (!data) {
+                return "—";
+            }
+
+            const date =
+                new Date(data);
+
+            if (
+                Number.isNaN(
+                    date.getTime()
+                )
+            ) {
+                return "—";
+            }
+
+            return date.toLocaleString(
+                "pt-BR"
+            );
+        }
+
+        function escaparHTML(valor) {
+            return String(valor)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+    </script>
+
+</body>
+</html>

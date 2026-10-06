@@ -118,6 +118,511 @@ process.env.PORT ||
 const rooms =
 new Map();
 
+const ADMIN_SESSION_DURATION_MS =
+1000 * 60 * 60 * 12;
+
+const adminSessions =
+new Map();
+
+const adminUsername =
+process.env.ADMIN_USERNAME || "";
+
+const adminPasswordHash =
+process.env.ADMIN_PASSWORD_HASH || "";
+
+const adminOrigin =
+process.env.ADMIN_ORIGIN || "";
+
+function createAdminSession() {
+const token =
+crypto
+.randomBytes(48)
+.toString("hex");
+
+adminSessions.set(
+token,
+{
+expiresAt:
+Date.now() +
+ADMIN_SESSION_DURATION_MS
+}
+);
+
+return token;
+}
+
+function getAdminSession(
+req
+) {
+const token =
+getBearerToken(req);
+
+if (!token) {
+return null;
+}
+
+const session =
+adminSessions.get(token);
+
+if (!session) {
+return null;
+}
+
+if (
+session.expiresAt <=
+Date.now()
+) {
+adminSessions.delete(token);
+return null;
+}
+
+return {
+token,
+...session
+};
+}
+
+function requireAdminSession(
+req,
+res,
+next
+) {
+const session =
+getAdminSession(req);
+
+if (!session) {
+return res
+.status(401)
+.json({
+success: false,
+message:
+"Sessão administrativa inválida ou expirada."
+});
+}
+
+req.adminSession =
+session;
+
+next();
+}
+
+app.use(
+"/api/admin",
+(req, res, next) => {
+const origin =
+typeof req.headers.origin ===
+"string"
+? req.headers.origin
+: "";
+
+if (
+adminOrigin &&
+origin === adminOrigin
+) {
+res.setHeader(
+"Access-Control-Allow-Origin",
+origin
+);
+res.setHeader(
+"Vary",
+"Origin"
+);
+}
+
+res.setHeader(
+"Access-Control-Allow-Headers",
+"Content-Type, Authorization"
+);
+
+res.setHeader(
+"Access-Control-Allow-Methods",
+"GET, POST, OPTIONS"
+);
+
+if (req.method === "OPTIONS") {
+return res.sendStatus(204);
+}
+
+next();
+}
+);
+
+app.post(
+"/api/admin/login",
+async (req, res) => {
+const username =
+typeof req.body?.username ===
+"string"
+? req.body.username.trim()
+: "";
+
+const password =
+typeof req.body?.password ===
+"string"
+? req.body.password
+: "";
+
+if (
+!adminUsername ||
+!adminPasswordHash
+) {
+return res
+.status(503)
+.json({
+success: false,
+message:
+"Login administrativo não configurado no servidor."
+});
+}
+
+if (
+!username ||
+!password
+) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"Informe usuário e senha."
+});
+}
+
+try {
+const usernameMatches =
+crypto.timingSafeEqual(
+Buffer.from(username),
+Buffer.from(adminUsername)
+);
+
+const passwordMatches =
+await bcrypt.compare(
+password,
+adminPasswordHash
+);
+
+if (
+!usernameMatches ||
+!passwordMatches
+) {
+return res
+.status(401)
+.json({
+success: false,
+message:
+"Usuário ou senha incorretos."
+});
+}
+
+const token =
+createAdminSession();
+
+console.log(
+"Login administrativo realizado."
+);
+
+return res
+.status(200)
+.json({
+success: true,
+token
+});
+}
+catch (error) {
+console.error(
+"Erro no login administrativo:",
+error.message
+);
+
+return res
+.status(500)
+.json({
+success: false,
+message:
+"Não foi possível entrar no painel administrativo."
+});
+}
+}
+);
+
+app.get(
+"/api/admin/me",
+requireAdminSession,
+(req, res) => {
+return res
+.status(200)
+.json({
+success: true,
+admin: true
+});
+}
+);
+
+app.post(
+"/api/admin/logout",
+requireAdminSession,
+(req, res) => {
+adminSessions.delete(
+req.adminSession.token
+);
+
+return res
+.status(200)
+.json({
+success: true
+});
+}
+);
+
+function getOnlineKsfIds() {
+const now =
+Date.now();
+
+const ids =
+new Set();
+
+for (
+const session
+of authSessions.values()
+) {
+if (
+session.expiresAt >
+now
+) {
+ids.add(
+session.ksfId
+);
+}
+}
+
+return ids;
+}
+
+app.get(
+"/api/admin/dashboard",
+requireAdminSession,
+async (req, res) => {
+if (!db) {
+return res
+.status(503)
+.json({
+success: false,
+message:
+"Banco de dados indisponível."
+});
+}
+
+try {
+const [
+totalResult,
+todayResult,
+recentResult
+] =
+await Promise.all([
+db.query(
+`
+SELECT COUNT(*)::int AS total
+FROM ksf_users
+`
+),
+db.query(
+`
+SELECT COUNT(*)::int AS total
+FROM ksf_users
+WHERE created_at >= CURRENT_DATE
+AND created_at < CURRENT_DATE + INTERVAL '1 day'
+`
+),
+db.query(
+`
+SELECT
+ksf_id,
+created_at,
+updated_at
+FROM ksf_users
+ORDER BY created_at DESC
+LIMIT 10
+`
+)
+]);
+
+const onlineIds =
+getOnlineKsfIds();
+
+const recentAccounts =
+recentResult.rows.map(
+user => ({
+ksfId:
+user.ksf_id,
+status:
+onlineIds.has(
+user.ksf_id
+)
+? "online"
+: "offline",
+createdAt:
+user.created_at,
+lastAccess:
+user.updated_at || null
+})
+);
+
+return res
+.status(200)
+.json({
+success: true,
+stats: {
+totalAccounts:
+totalResult.rows[0]?.total || 0,
+onlineNow:
+onlineIds.size,
+newToday:
+todayResult.rows[0]?.total || 0,
+currentVersion:
+"0.7.0"
+},
+services: {
+backend:
+"online",
+database:
+"online",
+multistream:
+"active"
+},
+recentAccounts,
+updatedAt:
+new Date().toISOString()
+});
+}
+catch (error) {
+console.error(
+"Erro ao carregar painel administrativo:",
+error.message
+);
+
+return res
+.status(500)
+.json({
+success: false,
+message:
+"Não foi possível carregar o painel administrativo."
+});
+}
+}
+);
+
+app.get(
+"/api/admin/users",
+requireAdminSession,
+async (req, res) => {
+if (!db) {
+return res
+.status(503)
+.json({
+success: false,
+message:
+"Banco de dados indisponível."
+});
+}
+
+const search =
+typeof req.query?.search ===
+"string"
+? req.query.search.trim()
+: "";
+
+try {
+const params = [];
+let where = "";
+
+if (search) {
+params.push(
+`%${search}%`
+);
+
+where =
+"WHERE UPPER(ksf_id) LIKE UPPER($1)";
+}
+
+const result =
+await db.query(
+`
+SELECT
+ksf_id,
+created_at,
+updated_at
+FROM ksf_users
+${where}
+ORDER BY created_at DESC
+LIMIT 200
+`,
+params
+);
+
+const onlineIds =
+getOnlineKsfIds();
+
+return res
+.status(200)
+.json({
+success: true,
+users:
+result.rows.map(
+user => ({
+ksfId:
+user.ksf_id,
+status:
+onlineIds.has(
+user.ksf_id
+)
+? "online"
+: "offline",
+createdAt:
+user.created_at,
+lastAccess:
+user.updated_at || null
+})
+)
+});
+}
+catch (error) {
+console.error(
+"Erro ao listar contas no painel administrativo:",
+error.message
+);
+
+return res
+.status(500)
+.json({
+success: false,
+message:
+"Não foi possível carregar as contas."
+});
+}
+}
+);
+
+setInterval(
+() => {
+const now =
+Date.now();
+
+for (
+const [token, session]
+of adminSessions.entries()
+) {
+if (
+session.expiresAt <=
+now
+) {
+adminSessions.delete(token);
+}
+}
+},
+1000 * 60 * 60
+).unref();
+
+
 app.get(
 "/",
 (req, res) => {
