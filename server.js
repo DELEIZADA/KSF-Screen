@@ -4,6 +4,7 @@ const { Server } = require("socket.io");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const app = express();
 
@@ -14,6 +15,51 @@ limit: "16kb"
 );
 
 const server = http.createServer(app);
+
+const smtpHost = process.env.SMTP_HOST || "";
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpUser = process.env.SMTP_USER || "";
+const smtpPass = process.env.SMTP_PASS || "";
+const smtpFrom = process.env.SMTP_FROM || "";
+
+const mailTransporter =
+smtpHost &&
+smtpUser &&
+smtpPass &&
+smtpFrom
+? nodemailer.createTransport({
+host: smtpHost,
+port: smtpPort,
+secure: smtpPort === 465,
+auth: {
+user: smtpUser,
+pass: smtpPass
+}
+})
+: null;
+
+async function testEmailConnection() {
+if (!mailTransporter) {
+console.log(
+"E-mail SMTP: configuração incompleta"
+);
+return;
+}
+
+try {
+await mailTransporter.verify();
+
+console.log(
+"E-mail SMTP: CONECTADO"
+);
+}
+catch (error) {
+console.error(
+"E-mail SMTP: ERRO DE CONEXÃO",
+error.message
+);
+}
+}
 
 const databaseUrl =
 process.env.DATABASE_URL;
@@ -65,8 +111,6 @@ origin: "*"
 }
 );
 
-// Local = 3000
-// Online = usa automaticamente a porta fornecida pelo servidor
 const PORT =
 process.env.PORT ||
 3000;
@@ -85,7 +129,8 @@ res.send(`
 }
 );
 
-const authSessions = new Map();
+const authSessions =
+new Map();
 
 const AUTH_SESSION_DURATION_MS =
 1000 * 60 * 60 * 24 * 30;
@@ -692,7 +737,11 @@ user.ksf_id,
 username:
 user.username,
 recoveryEmail:
-user.recovery_email,
+user.recovery_email_verified
+? maskEmail(
+user.recovery_email
+)
+: null,
 recoveryEmailVerified:
 Boolean(
 user.recovery_email_verified
@@ -944,19 +993,6 @@ message:
 });
 }
 
-if (
-currentPassword ===
-newPassword
-) {
-return res
-.status(400)
-.json({
-success: false,
-message:
-"A nova senha deve ser diferente da senha atual."
-});
-}
-
 try {
 const result =
 await db.query(
@@ -1001,11 +1037,27 @@ user.password_hash
 
 if (!passwordMatches) {
 return res
-.status(401)
+.status(400)
 .json({
 success: false,
 message:
 "A senha atual está incorreta."
+});
+}
+
+const newPasswordMatchesCurrent =
+await bcrypt.compare(
+newPassword,
+user.password_hash
+);
+
+if (newPasswordMatchesCurrent) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"A nova senha deve ser diferente da senha atual."
 });
 }
 
@@ -1069,6 +1121,1138 @@ return res
 success: false,
 message:
 "Não foi possível alterar a senha."
+});
+}
+}
+);
+
+function normalizeEmail(
+email
+) {
+return typeof email ===
+"string"
+? email.trim().toLowerCase()
+: "";
+}
+
+function isValidEmail(
+email
+) {
+return (
+email.length <= 254 &&
+/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+email
+)
+);
+}
+
+function maskEmail(
+email
+) {
+const normalized =
+normalizeEmail(email);
+
+const atIndex =
+normalized.indexOf("@");
+
+if (atIndex <= 0) {
+return "";
+}
+
+const local =
+normalized.slice(
+0,
+atIndex
+);
+
+const domain =
+normalized.slice(
+atIndex + 1
+);
+
+const visibleLocal =
+local.slice(
+0,
+Math.min(
+2,
+local.length
+)
+);
+
+const hiddenLocal =
+"*".repeat(
+Math.max(
+3,
+local.length -
+visibleLocal.length
+)
+);
+
+return `${visibleLocal}${hiddenLocal}@${domain}`;
+}
+
+function generateEmailCode() {
+return String(
+crypto.randomInt(
+100000,
+1000000
+)
+);
+}
+
+async function saveEmailVerificationCode(
+ksfId,
+email,
+code
+) {
+const existing =
+await db.query(
+`
+SELECT created_at
+FROM ksf_email_verifications
+WHERE ksf_id = $1
+LIMIT 1
+`,
+[
+ksfId
+]
+);
+
+if (
+existing.rowCount >
+0
+) {
+const createdAt =
+new Date(
+existing.rows[0].created_at
+).getTime();
+
+if (
+Number.isFinite(
+createdAt
+) &&
+Date.now() -
+createdAt <
+60000
+) {
+const error =
+new Error(
+"Aguarde 1 minuto antes de solicitar outro código."
+);
+
+error.code =
+"KSF_EMAIL_RATE_LIMIT";
+
+throw error;
+}
+}
+
+const codeHash =
+await bcrypt.hash(
+code,
+10
+);
+
+await db.query(
+`
+INSERT INTO ksf_email_verifications
+(
+ksf_id,
+email,
+code_hash,
+attempts,
+expires_at,
+created_at
+)
+VALUES
+(
+$1,
+$2,
+$3,
+0,
+NOW() + INTERVAL '10 minutes',
+NOW()
+)
+ON CONFLICT (ksf_id)
+DO UPDATE SET
+email = EXCLUDED.email,
+code_hash = EXCLUDED.code_hash,
+attempts = 0,
+expires_at = EXCLUDED.expires_at,
+created_at = NOW()
+`,
+[
+ksfId,
+email,
+codeHash
+]
+);
+}
+
+async function sendVerificationEmail(
+email,
+code,
+subject
+) {
+if (!mailTransporter) {
+const error =
+new Error(
+"Serviço de e-mail não configurado."
+);
+
+error.code =
+"KSF_SMTP_UNAVAILABLE";
+
+throw error;
+}
+
+await mailTransporter.sendMail({
+from:
+`KSF Screen <${smtpFrom}>`,
+to:
+email,
+subject,
+text:
+`Seu código KSF Screen é: ${code}\n\n` +
+"Este código expira em 10 minutos.\n" +
+"Se você não solicitou este código, ignore este e-mail.",
+html:
+`<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;">` +
+`<h2>KSF Screen</h2>` +
+`<p>Seu código de verificação é:</p>` +
+`<div style="font-size:32px;font-weight:bold;letter-spacing:6px;margin:20px 0;">${code}</div>` +
+`<p>Este código expira em <strong>10 minutos</strong>.</p>` +
+`<p>Se você não solicitou este código, ignore este e-mail.</p>` +
+`</div>`
+});
+}
+
+async function verifyStoredEmailCode(
+ksfId,
+code
+) {
+const result =
+await db.query(
+`
+SELECT
+email,
+code_hash,
+attempts,
+expires_at
+FROM ksf_email_verifications
+WHERE ksf_id = $1
+LIMIT 1
+`,
+[
+ksfId
+]
+);
+
+if (
+result.rowCount ===
+0
+) {
+return {
+success: false,
+status: 400,
+message:
+"Nenhum código de verificação foi solicitado."
+};
+}
+
+const verification =
+result.rows[0];
+
+if (
+new Date(
+verification.expires_at
+).getTime() <=
+Date.now()
+) {
+await db.query(
+`
+DELETE FROM ksf_email_verifications
+WHERE ksf_id = $1
+`,
+[
+ksfId
+]
+);
+
+return {
+success: false,
+status: 400,
+message:
+"O código expirou. Solicite um novo código."
+};
+}
+
+if (
+Number(
+verification.attempts
+) >= 5
+) {
+await db.query(
+`
+DELETE FROM ksf_email_verifications
+WHERE ksf_id = $1
+`,
+[
+ksfId
+]
+);
+
+return {
+success: false,
+status: 429,
+message:
+"Muitas tentativas incorretas. Solicite um novo código."
+};
+}
+
+const matches =
+await bcrypt.compare(
+code,
+verification.code_hash
+);
+
+if (!matches) {
+await db.query(
+`
+UPDATE ksf_email_verifications
+SET attempts = attempts + 1
+WHERE ksf_id = $1
+`,
+[
+ksfId
+]
+);
+
+return {
+success: false,
+status: 400,
+message:
+"Código incorreto."
+};
+}
+
+return {
+success: true,
+email:
+verification.email
+};
+}
+
+app.post(
+"/api/account/recovery-email/request",
+requireAuthSession,
+async (req, res) => {
+if (!db) {
+return res
+.status(503)
+.json({
+success: false,
+message:
+"Banco de dados indisponível."
+});
+}
+
+const email =
+normalizeEmail(
+req.body?.email
+);
+
+const currentPassword =
+typeof req.body?.currentPassword ===
+"string"
+? req.body.currentPassword
+: "";
+
+if (
+!isValidEmail(
+email
+)
+) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"Informe um e-mail válido."
+});
+}
+
+if (!currentPassword) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"Informe sua senha atual para confirmar o e-mail."
+});
+}
+
+try {
+const userResult =
+await db.query(
+`
+SELECT
+ksf_id,
+password_hash
+FROM ksf_users
+WHERE ksf_id = $1
+LIMIT 1
+`,
+[
+req.authSession.ksfId
+]
+);
+
+if (
+userResult.rowCount ===
+0
+) {
+authSessions.delete(
+req.authSession.token
+);
+
+return res
+.status(401)
+.json({
+success: false,
+message:
+"Conta não encontrada."
+});
+}
+
+const user =
+userResult.rows[0];
+
+const passwordMatches =
+await bcrypt.compare(
+currentPassword,
+user.password_hash
+);
+
+if (!passwordMatches) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"A senha atual está incorreta."
+});
+}
+
+const emailOwner =
+await db.query(
+`
+SELECT ksf_id
+FROM ksf_users
+WHERE LOWER(recovery_email) = LOWER($1)
+AND ksf_id <> $2
+LIMIT 1
+`,
+[
+email,
+user.ksf_id
+]
+);
+
+if (
+emailOwner.rowCount >
+0
+) {
+return res
+.status(409)
+.json({
+success: false,
+message:
+"Esse e-mail já está vinculado a outra conta."
+});
+}
+
+const code =
+generateEmailCode();
+
+await saveEmailVerificationCode(
+user.ksf_id,
+email,
+code
+);
+
+try {
+await sendVerificationEmail(
+email,
+code,
+"Código de verificação - KSF Screen"
+);
+}
+
+catch (error) {
+await db.query(
+`
+DELETE FROM ksf_email_verifications
+WHERE ksf_id = $1
+`,
+[
+user.ksf_id
+]
+);
+
+throw error;
+}
+
+return res
+.status(200)
+.json({
+success: true,
+message:
+"Código enviado para o e-mail informado.",
+email:
+maskEmail(email)
+});
+}
+
+catch (error) {
+if (
+error.code ===
+"KSF_EMAIL_RATE_LIMIT"
+) {
+return res
+.status(429)
+.json({
+success: false,
+message:
+error.message
+});
+}
+
+console.error(
+"Erro ao enviar código de e-mail:",
+error.message
+);
+
+return res
+.status(500)
+.json({
+success: false,
+message:
+"Não foi possível enviar o código de verificação."
+});
+}
+}
+);
+
+app.post(
+"/api/account/recovery-email/verify",
+requireAuthSession,
+async (req, res) => {
+if (!db) {
+return res
+.status(503)
+.json({
+success: false,
+message:
+"Banco de dados indisponível."
+});
+}
+
+const code =
+typeof req.body?.code ===
+"string"
+? req.body.code.trim()
+: "";
+
+if (
+!/^\d{6}$/.test(
+code
+)
+) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"Informe o código de 6 dígitos."
+});
+}
+
+try {
+const verification =
+await verifyStoredEmailCode(
+req.authSession.ksfId,
+code
+);
+
+if (
+!verification.success
+) {
+return res
+.status(
+verification.status
+)
+.json({
+success: false,
+message:
+verification.message
+});
+}
+
+await db.query(
+`
+UPDATE ksf_users
+SET
+recovery_email = $1,
+recovery_email_verified = TRUE,
+updated_at = NOW()
+WHERE ksf_id = $2
+`,
+[
+verification.email,
+req.authSession.ksfId
+]
+);
+
+await db.query(
+`
+DELETE FROM ksf_email_verifications
+WHERE ksf_id = $1
+`,
+[
+req.authSession.ksfId
+]
+);
+
+return res
+.status(200)
+.json({
+success: true,
+message:
+"E-mail de recuperação verificado com sucesso.",
+recoveryEmail:
+maskEmail(
+verification.email
+),
+recoveryEmailVerified:
+true
+});
+}
+
+catch (error) {
+console.error(
+"Erro ao verificar e-mail:",
+error.message
+);
+
+return res
+.status(500)
+.json({
+success: false,
+message:
+"Não foi possível verificar o e-mail."
+});
+}
+}
+);
+
+app.delete(
+"/api/account/recovery-email",
+requireAuthSession,
+async (req, res) => {
+if (!db) {
+return res
+.status(503)
+.json({
+success: false,
+message:
+"Banco de dados indisponível."
+});
+}
+
+const currentPassword =
+typeof req.body?.currentPassword ===
+"string"
+? req.body.currentPassword
+: "";
+
+if (!currentPassword) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"Informe sua senha atual."
+});
+}
+
+try {
+const result =
+await db.query(
+`
+SELECT password_hash
+FROM ksf_users
+WHERE ksf_id = $1
+LIMIT 1
+`,
+[
+req.authSession.ksfId
+]
+);
+
+if (
+result.rowCount ===
+0
+) {
+authSessions.delete(
+req.authSession.token
+);
+
+return res
+.status(401)
+.json({
+success: false,
+message:
+"Conta não encontrada."
+});
+}
+
+const passwordMatches =
+await bcrypt.compare(
+currentPassword,
+result.rows[0].password_hash
+);
+
+if (!passwordMatches) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"A senha atual está incorreta."
+});
+}
+
+await db.query(
+`
+UPDATE ksf_users
+SET
+recovery_email = NULL,
+recovery_email_verified = FALSE,
+updated_at = NOW()
+WHERE ksf_id = $1
+`,
+[
+req.authSession.ksfId
+]
+);
+
+await db.query(
+`
+DELETE FROM ksf_email_verifications
+WHERE ksf_id = $1
+`,
+[
+req.authSession.ksfId
+]
+);
+
+return res
+.status(200)
+.json({
+success: true,
+message:
+"E-mail de recuperação removido."
+});
+}
+
+catch (error) {
+console.error(
+"Erro ao remover e-mail de recuperação:",
+error.message
+);
+
+return res
+.status(500)
+.json({
+success: false,
+message:
+"Não foi possível remover o e-mail de recuperação."
+});
+}
+}
+);
+
+app.post(
+"/api/auth/recovery/request",
+async (req, res) => {
+if (!db) {
+return res
+.status(503)
+.json({
+success: false,
+message:
+"Banco de dados indisponível."
+});
+}
+
+const identifier =
+typeof req.body?.identifier ===
+"string"
+? req.body.identifier.trim()
+: "";
+
+if (!identifier) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"Informe seu nome de usuário ou ID KSF."
+});
+}
+
+const genericResponse = {
+success: true,
+message:
+"Se a conta possuir um e-mail de recuperação verificado, um código será enviado."
+};
+
+try {
+const result =
+await db.query(
+`
+SELECT
+ksf_id,
+recovery_email,
+recovery_email_verified
+FROM ksf_users
+WHERE
+LOWER(username) = LOWER($1)
+OR UPPER(ksf_id) = UPPER($1)
+LIMIT 1
+`,
+[
+identifier
+]
+);
+
+if (
+result.rowCount ===
+0 ||
+!result.rows[0].recovery_email ||
+!result.rows[0].recovery_email_verified
+) {
+return res
+.status(200)
+.json(
+genericResponse
+);
+}
+
+const user =
+result.rows[0];
+
+const code =
+generateEmailCode();
+
+try {
+await saveEmailVerificationCode(
+user.ksf_id,
+normalizeEmail(
+user.recovery_email
+),
+code
+);
+}
+
+catch (error) {
+if (
+error.code ===
+"KSF_EMAIL_RATE_LIMIT"
+) {
+return res
+.status(200)
+.json(
+genericResponse
+);
+}
+
+throw error;
+}
+
+try {
+await sendVerificationEmail(
+user.recovery_email,
+code,
+"Recuperação de senha - KSF Screen"
+);
+}
+
+catch (error) {
+await db.query(
+`
+DELETE FROM ksf_email_verifications
+WHERE ksf_id = $1
+`,
+[
+user.ksf_id
+]
+);
+
+throw error;
+}
+
+return res
+.status(200)
+.json(
+genericResponse
+);
+}
+
+catch (error) {
+console.error(
+"Erro ao solicitar recuperação de senha:",
+error.message
+);
+
+return res
+.status(200)
+.json(
+genericResponse
+);
+}
+}
+);
+
+app.post(
+"/api/auth/recovery/reset",
+async (req, res) => {
+if (!db) {
+return res
+.status(503)
+.json({
+success: false,
+message:
+"Banco de dados indisponível."
+});
+}
+
+const identifier =
+typeof req.body?.identifier ===
+"string"
+? req.body.identifier.trim()
+: "";
+
+const code =
+typeof req.body?.code ===
+"string"
+? req.body.code.trim()
+: "";
+
+const newPassword =
+typeof req.body?.newPassword ===
+"string"
+? req.body.newPassword
+: "";
+
+if (
+!identifier ||
+!/^\d{6}$/.test(
+code
+)
+) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"Informe a conta e o código de 6 dígitos."
+});
+}
+
+if (
+newPassword.length < 8 ||
+newPassword.length > 72
+) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"A nova senha deve ter entre 8 e 72 caracteres."
+});
+}
+
+try {
+const result =
+await db.query(
+`
+SELECT
+ksf_id,
+password_hash,
+recovery_email,
+recovery_email_verified
+FROM ksf_users
+WHERE
+LOWER(username) = LOWER($1)
+OR UPPER(ksf_id) = UPPER($1)
+LIMIT 1
+`,
+[
+identifier
+]
+);
+
+if (
+result.rowCount ===
+0 ||
+!result.rows[0].recovery_email ||
+!result.rows[0].recovery_email_verified
+) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"Código inválido ou expirado."
+});
+}
+
+const user =
+result.rows[0];
+
+const verification =
+await verifyStoredEmailCode(
+user.ksf_id,
+code
+);
+
+if (
+!verification.success
+) {
+return res
+.status(
+verification.status
+)
+.json({
+success: false,
+message:
+verification.message
+});
+}
+
+if (
+normalizeEmail(
+verification.email
+) !==
+normalizeEmail(
+user.recovery_email
+)
+) {
+await db.query(
+`
+DELETE FROM ksf_email_verifications
+WHERE ksf_id = $1
+`,
+[
+user.ksf_id
+]
+);
+
+return res
+.status(400)
+.json({
+success: false,
+message:
+"Código inválido ou expirado."
+});
+}
+
+const samePassword =
+await bcrypt.compare(
+newPassword,
+user.password_hash
+);
+
+if (samePassword) {
+return res
+.status(400)
+.json({
+success: false,
+message:
+"A nova senha deve ser diferente da senha atual."
+});
+}
+
+const newPasswordHash =
+await bcrypt.hash(
+newPassword,
+12
+);
+
+await db.query(
+`
+UPDATE ksf_users
+SET
+password_hash = $1,
+updated_at = NOW()
+WHERE ksf_id = $2
+`,
+[
+newPasswordHash,
+user.ksf_id
+]
+);
+
+await db.query(
+`
+DELETE FROM ksf_email_verifications
+WHERE ksf_id = $1
+`,
+[
+user.ksf_id
+]
+);
+
+for (
+const [token, session]
+of authSessions.entries()
+) {
+if (
+session.ksfId ===
+user.ksf_id
+) {
+authSessions.delete(token);
+}
+}
+
+console.log(
+"Senha recuperada:",
+user.ksf_id
+);
+
+return res
+.status(200)
+.json({
+success: true,
+message:
+"Senha redefinida com sucesso. Entre com a nova senha."
+});
+}
+
+catch (error) {
+console.error(
+"Erro ao redefinir senha:",
+error.message
+);
+
+return res
+.status(500)
+.json({
+success: false,
+message:
+"Não foi possível redefinir a senha."
 });
 }
 }
@@ -1929,6 +3113,7 @@ PORT,
 "0.0.0.0",
 async () => {
 await testDatabaseConnection();
+await testEmailConnection();
 
 console.log("");
 

@@ -114,6 +114,57 @@ BARRA DA JANELA
 
 /*
 ================================
+CARREGAMENTO INICIAL
+================================
+*/
+
+#startupLoading {
+    position: fixed;
+    top: 36px;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0f1116;
+}
+
+.startup-loading-card {
+    text-align: center;
+}
+
+.startup-loading-title {
+    font-size: 42px;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.startup-loading-text {
+    color: #9da3ae;
+    font-size: 14px;
+}
+
+.startup-loading-spinner {
+    width: 34px;
+    height: 34px;
+    margin: 22px auto 0;
+    border: 4px solid #2b303b;
+    border-top-color: #5865f2;
+    border-radius: 50%;
+    animation: startupSpin .8s linear infinite;
+}
+
+@keyframes startupSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+/*
+================================
 CONTA KSF
 ================================
 */
@@ -708,6 +759,95 @@ ATUALIZAÇÕES
         padding: 10px 14px;
     }
 }
+
+/*
+================================
+PERFIL KSF
+================================
+*/
+
+.home-account {
+    margin-top: 14px;
+}
+
+#profile {
+    min-height: calc(100vh - 36px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.profile-card {
+    width: 560px;
+    max-width: 100%;
+    max-height: calc(100vh - 84px);
+    overflow-y: auto;
+    background: #181b22;
+    padding: 32px;
+    border-radius: 18px;
+}
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.profile-header h2 {
+    margin: 0;
+}
+
+.profile-section {
+    background: #101217;
+    border: 1px solid #303642;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 14px;
+}
+
+.profile-label {
+    color: #8f96a3;
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.profile-value {
+    font-size: 16px;
+    font-weight: bold;
+    word-break: break-word;
+}
+
+.profile-section input {
+    text-transform: none;
+    text-align: left;
+    font-size: 15px;
+}
+
+.profile-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.profile-actions button {
+    flex: 1;
+}
+
+.profile-message {
+    min-height: 20px;
+    margin-top: 14px;
+    color: #ff7478;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.profile-message.success {
+    color: #23d18b;
+}
+
 </style>
 </head>
 
@@ -751,6 +891,15 @@ BARRA DA JANELA
 
     </div>
 
+</div>
+
+
+<div id="startupLoading">
+    <div class="startup-loading-card">
+        <div class="startup-loading-title">KSF Screen</div>
+        <div class="startup-loading-text">Verificando sua sessão...</div>
+        <div class="startup-loading-spinner"></div>
+    </div>
 </div>
 
 
@@ -870,6 +1019,62 @@ HOME
             class="secondary full">
             Entrar na Sala
         </button>
+
+        <button id="profileButton" class="secondary full home-account">
+            Minha Conta
+        </button>
+
+    </div>
+
+</div>
+
+
+<!--
+================================
+PERFIL KSF
+================================
+-->
+
+<div id="profile">
+
+    <div class="profile-card">
+
+        <div class="profile-header">
+            <h2>Minha Conta</h2>
+            <button id="backFromProfileButton" class="secondary">Voltar</button>
+        </div>
+
+        <div class="profile-section">
+            <div class="profile-label">ID KSF permanente</div>
+            <div id="profileKsfId" class="profile-value">---</div>
+        </div>
+
+        <div class="profile-section">
+            <div class="profile-label">Nome de usuário atual</div>
+            <div id="profileUsername" class="profile-value">---</div>
+
+            <input id="profileNewUsername" maxlength="24" autocomplete="username" placeholder="Novo nome de usuário">
+
+            <div class="profile-actions">
+                <button id="changeUsernameButton" class="primary">Alterar nome</button>
+            </div>
+        </div>
+
+        <div class="profile-section">
+            <div class="profile-label">Alterar senha</div>
+
+            <input id="profileCurrentPassword" type="password" maxlength="72" autocomplete="current-password" placeholder="Senha atual">
+            <input id="profileNewPassword" type="password" maxlength="72" autocomplete="new-password" placeholder="Nova senha (mínimo 8 caracteres)">
+            <input id="profileNewPasswordConfirm" type="password" maxlength="72" autocomplete="new-password" placeholder="Confirmar nova senha">
+
+            <div class="profile-actions">
+                <button id="changePasswordButton" class="primary">Alterar senha</button>
+            </div>
+        </div>
+
+        <div id="profileMessage" class="profile-message"></div>
+
+        <button id="logoutButton" class="danger full">Sair da conta</button>
 
     </div>
 
@@ -1202,6 +1407,9 @@ const windowCloseButton =
     );
 
 
+const startupLoading =
+    document.getElementById("startupLoading");
+
 const auth =
     document.getElementById("auth");
 
@@ -1252,6 +1460,45 @@ const KSF_AUTH_TOKEN_KEY =
 
 const home =
     document.getElementById("home");
+
+const profile =
+    document.getElementById("profile");
+
+const profileButton =
+    document.getElementById("profileButton");
+
+const backFromProfileButton =
+    document.getElementById("backFromProfileButton");
+
+const profileKsfId =
+    document.getElementById("profileKsfId");
+
+const profileUsername =
+    document.getElementById("profileUsername");
+
+const profileNewUsername =
+    document.getElementById("profileNewUsername");
+
+const profileCurrentPassword =
+    document.getElementById("profileCurrentPassword");
+
+const profileNewPassword =
+    document.getElementById("profileNewPassword");
+
+const profileNewPasswordConfirm =
+    document.getElementById("profileNewPasswordConfirm");
+
+const changeUsernameButton =
+    document.getElementById("changeUsernameButton");
+
+const changePasswordButton =
+    document.getElementById("changePasswordButton");
+
+const logoutButton =
+    document.getElementById("logoutButton");
+
+const profileMessage =
+    document.getElementById("profileMessage");
 
 const room =
     document.getElementById("room");
@@ -1468,12 +1715,22 @@ function showRegisterForm() {
 }
 
 
+function finishStartupLoading() {
+
+    startupLoading.style.display =
+        "none";
+
+}
+
+
 function enterKsfApp(
     user
 ) {
 
     currentKsfUser =
         user || null;
+
+    finishStartupLoading();
 
     auth.style.display =
         "none";
@@ -1516,6 +1773,419 @@ function clearKsfSession() {
 }
 
 
+function setProfileMessage(
+    message,
+    success = false
+) {
+
+    profileMessage.textContent =
+        message || "";
+
+    profileMessage.classList.toggle(
+        "success",
+        Boolean(success)
+    );
+}
+
+
+function returnToLoginFromExpiredSession() {
+
+    clearKsfSession();
+
+    profile.style.display =
+        "none";
+
+    room.style.display =
+        "none";
+
+    home.style.display =
+        "none";
+
+    auth.style.display =
+        "flex";
+
+    loginPassword.value =
+        "";
+
+    showLoginForm();
+
+    setAuthMessage(
+        "Sua sessão expirou. Entre novamente."
+    );
+}
+
+
+async function accountRequest(
+    route,
+    options = {}
+) {
+
+    if (!currentKsfToken) {
+        returnToLoginFromExpiredSession();
+        throw new Error(
+            "Sua sessão expirou. Entre novamente."
+        );
+    }
+
+    const response =
+        await fetch(
+            KSF_SERVER_URL + route,
+            {
+                method:
+                    options.method || "GET",
+
+                headers: {
+                    "Authorization":
+                        "Bearer " +
+                        currentKsfToken,
+
+                    ...(options.body
+                        ? {
+                            "Content-Type":
+                                "application/json"
+                        }
+                        : {})
+                },
+
+                ...(options.body
+                    ? {
+                        body:
+                            JSON.stringify(
+                                options.body
+                            )
+                    }
+                    : {})
+            }
+        );
+
+    let data = null;
+
+    try {
+        data = await response.json();
+    }
+    catch (error) {
+        data = null;
+    }
+
+    if (
+        response.status === 401 &&
+        data &&
+        (
+            data.message === "Sessão inválida ou expirada. Entre novamente." ||
+            data.message === "Conta não encontrada."
+        )
+    ) {
+        returnToLoginFromExpiredSession();
+        throw new Error(
+            "Sua sessão expirou. Entre novamente."
+        );
+    }
+
+    if (
+        !response.ok ||
+        !data ||
+        !data.success
+    ) {
+        throw new Error(
+            data && data.message
+                ? data.message
+                : "Não foi possível conectar ao servidor KSF."
+        );
+    }
+
+    return data;
+}
+
+
+async function openKsfProfile() {
+
+    home.style.display =
+        "none";
+
+    profile.style.display =
+        "flex";
+
+    updatePanel.style.display =
+        "none";
+
+    setProfileMessage("");
+
+    profileKsfId.textContent =
+        "Carregando...";
+
+    profileUsername.textContent =
+        "Carregando...";
+
+    profileNewUsername.value =
+        "";
+
+    try {
+
+        const data =
+            await accountRequest(
+                "/api/account/profile"
+            );
+
+        currentKsfUser =
+            data.user;
+
+        profileKsfId.textContent =
+            data.user.ksfId || "---";
+
+        profileUsername.textContent =
+            data.user.username || "---";
+
+    }
+    catch (error) {
+
+        if (currentKsfToken) {
+            setProfileMessage(
+                error.message
+            );
+        }
+    }
+}
+
+
+profileButton.onclick =
+    () => {
+        openKsfProfile();
+    };
+
+
+backFromProfileButton.onclick =
+    () => {
+
+        profile.style.display =
+            "none";
+
+        home.style.display =
+            "flex";
+
+        updatePanel.style.display =
+            "block";
+
+        setProfileMessage("");
+    };
+
+
+changeUsernameButton.onclick =
+    async () => {
+
+        const username =
+            profileNewUsername.value.trim();
+
+        if (!username) {
+            setProfileMessage(
+                "Digite o novo nome de usuário."
+            );
+            return;
+        }
+
+        changeUsernameButton.disabled =
+            true;
+
+        changeUsernameButton.textContent =
+            "Alterando...";
+
+        setProfileMessage("");
+
+        try {
+
+            const data =
+                await accountRequest(
+                    "/api/account/username",
+                    {
+                        method: "PATCH",
+                        body: { username }
+                    }
+                );
+
+            currentKsfUser =
+                data.user;
+
+            profileUsername.textContent =
+                data.user.username;
+
+            profileNewUsername.value =
+                "";
+
+            setProfileMessage(
+                "Nome de usuário alterado com sucesso.",
+                true
+            );
+
+        }
+        catch (error) {
+
+            if (currentKsfToken) {
+                setProfileMessage(
+                    error.message
+                );
+            }
+        }
+        finally {
+
+            changeUsernameButton.disabled =
+                false;
+
+            changeUsernameButton.textContent =
+                "Alterar nome";
+        }
+    };
+
+
+changePasswordButton.onclick =
+    async () => {
+
+        const currentPassword =
+            profileCurrentPassword.value;
+
+        const newPassword =
+            profileNewPassword.value;
+
+        const confirmPassword =
+            profileNewPasswordConfirm.value;
+
+        if (
+            !currentPassword ||
+            !newPassword ||
+            !confirmPassword
+        ) {
+            setProfileMessage(
+                "Preencha os três campos de senha."
+            );
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            setProfileMessage(
+                "As novas senhas não são iguais."
+            );
+            return;
+        }
+
+        changePasswordButton.disabled =
+            true;
+
+        changePasswordButton.textContent =
+            "Alterando...";
+
+        setProfileMessage("");
+
+        try {
+
+            await accountRequest(
+                "/api/account/password",
+                {
+                    method: "PATCH",
+                    body: {
+                        currentPassword,
+                        newPassword
+                    }
+                }
+            );
+
+            profileCurrentPassword.value =
+                "";
+
+            profileNewPassword.value =
+                "";
+
+            profileNewPasswordConfirm.value =
+                "";
+
+            setProfileMessage(
+                "Senha alterada com sucesso.",
+                true
+            );
+
+        }
+        catch (error) {
+
+            if (currentKsfToken) {
+                setProfileMessage(
+                    error.message
+                );
+            }
+        }
+        finally {
+
+            changePasswordButton.disabled =
+                false;
+
+            changePasswordButton.textContent =
+                "Alterar senha";
+        }
+    };
+
+
+logoutButton.onclick =
+    async () => {
+
+        logoutButton.disabled =
+            true;
+
+        logoutButton.textContent =
+            "Saindo...";
+
+        try {
+
+            if (currentKsfToken) {
+                await fetch(
+                    KSF_SERVER_URL +
+                    "/api/auth/logout",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Authorization":
+                                "Bearer " +
+                                currentKsfToken
+                        }
+                    }
+                );
+            }
+
+        }
+        catch (error) {
+        }
+
+        clearKsfSession();
+
+        profileCurrentPassword.value =
+            "";
+
+        profileNewPassword.value =
+            "";
+
+        profileNewPasswordConfirm.value =
+            "";
+
+        profile.style.display =
+            "none";
+
+        room.style.display =
+            "none";
+
+        home.style.display =
+            "none";
+
+        auth.style.display =
+            "flex";
+
+        loginPassword.value =
+            "";
+
+        logoutButton.disabled =
+            false;
+
+        logoutButton.textContent =
+            "Sair da conta";
+
+        showLoginForm();
+    };
+
+
 async function restoreKsfSession() {
 
     const savedToken =
@@ -1524,6 +2194,7 @@ async function restoreKsfSession() {
         );
 
     if (!savedToken) {
+        finishStartupLoading();
         showLoginForm();
         return;
     }
@@ -1565,6 +2236,7 @@ async function restoreKsfSession() {
             !data.user
         ) {
             clearKsfSession();
+            finishStartupLoading();
             showLoginForm();
             return;
         }
@@ -1577,6 +2249,7 @@ async function restoreKsfSession() {
     catch (error) {
 
         clearKsfSession();
+        finishStartupLoading();
         showLoginForm();
 
         setAuthMessage(
