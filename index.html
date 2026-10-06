@@ -848,6 +848,30 @@ PERFIL KSF
     color: #23d18b;
 }
 
+
+
+/* RECUPERAÇÃO DE CONTA */
+.recovery-note {
+    color: #9da3ae;
+    font-size: 13px;
+    line-height: 1.45;
+    margin-top: 8px;
+}
+
+#recoveryForm {
+    display: none;
+}
+
+.recovery-step {
+    margin-top: 12px;
+}
+
+.recovery-email-status {
+    margin-top: 8px;
+    color: #9da3ae;
+    font-size: 13px;
+}
+
 </style>
 </head>
 
@@ -939,6 +963,10 @@ CONTA KSF
             </button>
 
             <div class="auth-switch">
+                <button id="showRecoveryButton" class="auth-link">Esqueci minha senha</button>
+            </div>
+
+            <div class="auth-switch">
                 Ainda não tem uma conta?
                 <button id="showRegisterButton" class="auth-link">Criar conta</button>
             </div>
@@ -976,6 +1004,25 @@ CONTA KSF
             <div class="auth-switch">
                 Já tem uma conta?
                 <button id="showLoginButton" class="auth-link">Entrar</button>
+            </div>
+
+        </div>
+
+        <div id="recoveryForm">
+
+            <input id="recoveryIdentifier" autocomplete="username" placeholder="Nome de usuário ou ID KSF">
+
+            <button id="requestRecoveryCodeButton" class="primary full">Enviar código</button>
+
+            <div id="recoveryResetFields" style="display: none;">
+                <input id="recoveryCode" inputmode="numeric" maxlength="6" placeholder="Código de 6 dígitos">
+                <input id="recoveryNewPassword" type="password" maxlength="72" autocomplete="new-password" placeholder="Nova senha (mínimo 8 caracteres)">
+                <input id="recoveryNewPasswordConfirm" type="password" maxlength="72" autocomplete="new-password" placeholder="Confirmar nova senha">
+                <button id="resetRecoveryPasswordButton" class="primary full">Redefinir senha</button>
+            </div>
+
+            <div class="auth-switch">
+                <button id="backToLoginFromRecoveryButton" class="auth-link">Voltar para entrar</button>
             </div>
 
         </div>
@@ -1069,6 +1116,35 @@ PERFIL KSF
 
             <div class="profile-actions">
                 <button id="changePasswordButton" class="primary">Alterar senha</button>
+            </div>
+        </div>
+
+        <div class="profile-section">
+            <div class="profile-label">E-mail de recuperação (opcional)</div>
+            <div id="profileRecoveryEmail" class="profile-value">Nenhum e-mail cadastrado</div>
+            <div id="profileRecoveryEmailStatus" class="recovery-email-status"></div>
+
+            <div id="profileRecoveryEmailAdd">
+                <input id="profileRecoveryEmailInput" type="email" autocomplete="email" placeholder="Seu e-mail de recuperação">
+                <input id="profileRecoveryEmailPassword" type="password" maxlength="72" autocomplete="current-password" placeholder="Senha atual">
+                <div class="profile-actions">
+                    <button id="requestRecoveryEmailButton" class="primary">Enviar código</button>
+                </div>
+            </div>
+
+            <div id="profileRecoveryEmailVerify" style="display: none;">
+                <input id="profileRecoveryEmailCode" inputmode="numeric" maxlength="6" placeholder="Código de 6 dígitos">
+                <div class="profile-actions">
+                    <button id="verifyRecoveryEmailButton" class="primary">Verificar e-mail</button>
+                    <button id="cancelRecoveryEmailButton" class="secondary">Cancelar</button>
+                </div>
+            </div>
+
+            <div id="profileRecoveryEmailRemove" style="display: none;">
+                <input id="profileRemoveRecoveryEmailPassword" type="password" maxlength="72" autocomplete="current-password" placeholder="Senha atual para remover">
+                <div class="profile-actions">
+                    <button id="removeRecoveryEmailButton" class="danger">Remover e-mail</button>
+                </div>
             </div>
         </div>
 
@@ -1452,6 +1528,36 @@ const registerButton =
 const showLoginButton =
     document.getElementById("showLoginButton");
 
+const showRecoveryButton =
+    document.getElementById("showRecoveryButton");
+
+const recoveryForm =
+    document.getElementById("recoveryForm");
+
+const recoveryIdentifier =
+    document.getElementById("recoveryIdentifier");
+
+const requestRecoveryCodeButton =
+    document.getElementById("requestRecoveryCodeButton");
+
+const recoveryResetFields =
+    document.getElementById("recoveryResetFields");
+
+const recoveryCode =
+    document.getElementById("recoveryCode");
+
+const recoveryNewPassword =
+    document.getElementById("recoveryNewPassword");
+
+const recoveryNewPasswordConfirm =
+    document.getElementById("recoveryNewPasswordConfirm");
+
+const resetRecoveryPasswordButton =
+    document.getElementById("resetRecoveryPasswordButton");
+
+const backToLoginFromRecoveryButton =
+    document.getElementById("backToLoginFromRecoveryButton");
+
 let currentKsfUser = null;
 let currentKsfToken = null;
 
@@ -1499,6 +1605,45 @@ const logoutButton =
 
 const profileMessage =
     document.getElementById("profileMessage");
+
+const profileRecoveryEmail =
+    document.getElementById("profileRecoveryEmail");
+
+const profileRecoveryEmailStatus =
+    document.getElementById("profileRecoveryEmailStatus");
+
+const profileRecoveryEmailAdd =
+    document.getElementById("profileRecoveryEmailAdd");
+
+const profileRecoveryEmailInput =
+    document.getElementById("profileRecoveryEmailInput");
+
+const profileRecoveryEmailPassword =
+    document.getElementById("profileRecoveryEmailPassword");
+
+const requestRecoveryEmailButton =
+    document.getElementById("requestRecoveryEmailButton");
+
+const profileRecoveryEmailVerify =
+    document.getElementById("profileRecoveryEmailVerify");
+
+const profileRecoveryEmailCode =
+    document.getElementById("profileRecoveryEmailCode");
+
+const verifyRecoveryEmailButton =
+    document.getElementById("verifyRecoveryEmailButton");
+
+const cancelRecoveryEmailButton =
+    document.getElementById("cancelRecoveryEmailButton");
+
+const profileRecoveryEmailRemove =
+    document.getElementById("profileRecoveryEmailRemove");
+
+const profileRemoveRecoveryEmailPassword =
+    document.getElementById("profileRemoveRecoveryEmailPassword");
+
+const removeRecoveryEmailButton =
+    document.getElementById("removeRecoveryEmailButton");
 
 const room =
     document.getElementById("room");
@@ -1687,6 +1832,9 @@ function showLoginForm() {
     registerForm.style.display =
         "none";
 
+    recoveryForm.style.display =
+        "none";
+
     authSubtitle.textContent =
         "Entre na sua conta KSF.";
 
@@ -1705,6 +1853,9 @@ function showRegisterForm() {
     registerForm.style.display =
         "block";
 
+    recoveryForm.style.display =
+        "none";
+
     authSubtitle.textContent =
         "Crie sua conta KSF.";
 
@@ -1712,6 +1863,22 @@ function showRegisterForm() {
 
     registerUsername.focus();
 
+}
+
+
+function showRecoveryForm() {
+
+    loginForm.style.display = "none";
+    registerForm.style.display = "none";
+    recoveryForm.style.display = "block";
+    recoveryResetFields.style.display = "none";
+    authSubtitle.textContent = "Recupere sua conta KSF.";
+    setAuthMessage("");
+    recoveryCode.value = "";
+    recoveryNewPassword.value = "";
+    recoveryNewPasswordConfirm.value = "";
+    recoveryIdentifier.value = loginIdentifier.value.trim();
+    recoveryIdentifier.focus();
 }
 
 
@@ -1897,6 +2064,29 @@ async function accountRequest(
 }
 
 
+function updateRecoveryEmailProfile(user) {
+    const verified = Boolean(user && user.recoveryEmailVerified);
+    const maskedEmail = user && user.recoveryEmail ? user.recoveryEmail : null;
+
+    profileRecoveryEmail.textContent = verified && maskedEmail
+        ? maskedEmail
+        : "Nenhum e-mail cadastrado";
+
+    profileRecoveryEmailStatus.textContent = verified
+        ? "E-mail verificado e disponível para recuperação de senha."
+        : "Cadastre um e-mail para recuperar sua senha caso esqueça.";
+
+    profileRecoveryEmailAdd.style.display = verified ? "none" : "block";
+    profileRecoveryEmailVerify.style.display = "none";
+    profileRecoveryEmailRemove.style.display = verified ? "block" : "none";
+
+    profileRecoveryEmailInput.value = "";
+    profileRecoveryEmailPassword.value = "";
+    profileRecoveryEmailCode.value = "";
+    profileRemoveRecoveryEmailPassword.value = "";
+}
+
+
 async function openKsfProfile() {
 
     home.style.display =
@@ -1934,6 +2124,8 @@ async function openKsfProfile() {
 
         profileUsername.textContent =
             data.user.username || "---";
+
+        updateRecoveryEmailProfile(data.user);
 
     }
     catch (error) {
@@ -2118,6 +2310,107 @@ changePasswordButton.onclick =
                 "Alterar senha";
         }
     };
+
+
+requestRecoveryEmailButton.onclick = async () => {
+    const email = profileRecoveryEmailInput.value.trim();
+    const currentPassword = profileRecoveryEmailPassword.value;
+
+    if (!email || !currentPassword) {
+        setProfileMessage("Informe o e-mail e sua senha atual.");
+        return;
+    }
+
+    requestRecoveryEmailButton.disabled = true;
+    requestRecoveryEmailButton.textContent = "Enviando...";
+    setProfileMessage("");
+
+    try {
+        const data = await accountRequest(
+            "/api/account/recovery-email/request",
+            { method: "POST", body: { email, currentPassword } }
+        );
+        profileRecoveryEmailVerify.style.display = "block";
+        profileRecoveryEmailAdd.style.display = "none";
+        profileRecoveryEmailPassword.value = "";
+        setProfileMessage(data.message || "Código enviado para o e-mail.", true);
+        profileRecoveryEmailCode.focus();
+    } catch (error) {
+        if (currentKsfToken) setProfileMessage(error.message);
+    } finally {
+        requestRecoveryEmailButton.disabled = false;
+        requestRecoveryEmailButton.textContent = "Enviar código";
+    }
+};
+
+verifyRecoveryEmailButton.onclick = async () => {
+    const code = profileRecoveryEmailCode.value.trim();
+    if (!/^\d{6}$/.test(code)) {
+        setProfileMessage("Informe o código de 6 dígitos.");
+        return;
+    }
+
+    verifyRecoveryEmailButton.disabled = true;
+    verifyRecoveryEmailButton.textContent = "Verificando...";
+    setProfileMessage("");
+
+    try {
+        const data = await accountRequest(
+            "/api/account/recovery-email/verify",
+            { method: "POST", body: { code } }
+        );
+        currentKsfUser = {
+            ...(currentKsfUser || {}),
+            recoveryEmail: data.recoveryEmail,
+            recoveryEmailVerified: true
+        };
+        updateRecoveryEmailProfile(currentKsfUser);
+        setProfileMessage(data.message || "E-mail verificado com sucesso.", true);
+    } catch (error) {
+        if (currentKsfToken) setProfileMessage(error.message);
+    } finally {
+        verifyRecoveryEmailButton.disabled = false;
+        verifyRecoveryEmailButton.textContent = "Verificar e-mail";
+    }
+};
+
+cancelRecoveryEmailButton.onclick = () => {
+    profileRecoveryEmailVerify.style.display = "none";
+    profileRecoveryEmailAdd.style.display = "block";
+    profileRecoveryEmailCode.value = "";
+    setProfileMessage("");
+};
+
+removeRecoveryEmailButton.onclick = async () => {
+    const currentPassword = profileRemoveRecoveryEmailPassword.value;
+    if (!currentPassword) {
+        setProfileMessage("Informe sua senha atual para remover o e-mail.");
+        return;
+    }
+
+    removeRecoveryEmailButton.disabled = true;
+    removeRecoveryEmailButton.textContent = "Removendo...";
+    setProfileMessage("");
+
+    try {
+        const data = await accountRequest(
+            "/api/account/recovery-email",
+            { method: "DELETE", body: { currentPassword } }
+        );
+        currentKsfUser = {
+            ...(currentKsfUser || {}),
+            recoveryEmail: null,
+            recoveryEmailVerified: false
+        };
+        updateRecoveryEmailProfile(currentKsfUser);
+        setProfileMessage(data.message || "E-mail de recuperação removido.", true);
+    } catch (error) {
+        if (currentKsfToken) setProfileMessage(error.message);
+    } finally {
+        removeRecoveryEmailButton.disabled = false;
+        removeRecoveryEmailButton.textContent = "Remover e-mail";
+    }
+};
 
 
 logoutButton.onclick =
@@ -2322,6 +2615,80 @@ showLoginButton.onclick =
     };
 
 
+showRecoveryButton.onclick = () => {
+    showRecoveryForm();
+};
+
+backToLoginFromRecoveryButton.onclick = () => {
+    showLoginForm();
+};
+
+requestRecoveryCodeButton.onclick = async () => {
+    const identifier = recoveryIdentifier.value.trim();
+    if (!identifier) {
+        setAuthMessage("Informe seu nome de usuário ou ID KSF.");
+        return;
+    }
+
+    requestRecoveryCodeButton.disabled = true;
+    requestRecoveryCodeButton.textContent = "Enviando...";
+    setAuthMessage("");
+
+    try {
+        const data = await sendAuthRequest(
+            "/api/auth/recovery/request",
+            { identifier }
+        );
+        recoveryResetFields.style.display = "block";
+        setAuthMessage(data.message, true);
+        recoveryCode.focus();
+    } catch (error) {
+        setAuthMessage(error.message);
+    } finally {
+        requestRecoveryCodeButton.disabled = false;
+        requestRecoveryCodeButton.textContent = "Enviar código";
+    }
+};
+
+resetRecoveryPasswordButton.onclick = async () => {
+    const identifier = recoveryIdentifier.value.trim();
+    const code = recoveryCode.value.trim();
+    const newPassword = recoveryNewPassword.value;
+    const confirmPassword = recoveryNewPasswordConfirm.value;
+
+    if (!identifier || !/^\d{6}$/.test(code) || !newPassword || !confirmPassword) {
+        setAuthMessage("Preencha a conta, o código de 6 dígitos e a nova senha.");
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        setAuthMessage("As novas senhas não são iguais.");
+        return;
+    }
+
+    resetRecoveryPasswordButton.disabled = true;
+    resetRecoveryPasswordButton.textContent = "Redefinindo...";
+    setAuthMessage("");
+
+    try {
+        const data = await sendAuthRequest(
+            "/api/auth/recovery/reset",
+            { identifier, code, newPassword }
+        );
+        loginIdentifier.value = identifier;
+        recoveryCode.value = "";
+        recoveryNewPassword.value = "";
+        recoveryNewPasswordConfirm.value = "";
+        showLoginForm();
+        setAuthMessage(data.message || "Senha redefinida com sucesso.", true);
+    } catch (error) {
+        setAuthMessage(error.message);
+    } finally {
+        resetRecoveryPasswordButton.disabled = false;
+        resetRecoveryPasswordButton.textContent = "Redefinir senha";
+    }
+};
+
+
 loginButton.onclick =
     async () => {
 
@@ -2522,6 +2889,19 @@ registerPasswordConfirm.addEventListener(
 
     }
 );
+
+
+recoveryCode.addEventListener("keydown", event => {
+    if (event.key === "Enter") resetRecoveryPasswordButton.click();
+});
+
+recoveryNewPasswordConfirm.addEventListener("keydown", event => {
+    if (event.key === "Enter") resetRecoveryPasswordButton.click();
+});
+
+profileRecoveryEmailCode.addEventListener("keydown", event => {
+    if (event.key === "Enter") verifyRecoveryEmailButton.click();
+});
 
 
 restoreKsfSession();
