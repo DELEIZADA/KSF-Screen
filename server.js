@@ -88,6 +88,13 @@ await db.query(
 "SELECT 1"
 );
 
+await db.query(
+`
+ALTER TABLE ksf_users
+ADD COLUMN IF NOT EXISTS last_access_at TIMESTAMPTZ
+`
+);
+
 console.log(
 "Banco de dados PostgreSQL: CONECTADO"
 );
@@ -289,10 +296,18 @@ message:
 }
 
 try {
+const usernameBuffer =
+Buffer.from(username);
+
+const adminUsernameBuffer =
+Buffer.from(adminUsername);
+
 const usernameMatches =
+usernameBuffer.length ===
+adminUsernameBuffer.length &&
 crypto.timingSafeEqual(
-Buffer.from(username),
-Buffer.from(adminUsername)
+usernameBuffer,
+adminUsernameBuffer
 );
 
 const passwordMatches =
@@ -374,30 +389,6 @@ success: true
 }
 );
 
-function getOnlineKsfIds() {
-const now =
-Date.now();
-
-const ids =
-new Set();
-
-for (
-const session
-of authSessions.values()
-) {
-if (
-session.expiresAt >
-now
-) {
-ids.add(
-session.ksfId
-);
-}
-}
-
-return ids;
-}
-
 app.get(
 "/api/admin/dashboard",
 requireAdminSession,
@@ -438,7 +429,7 @@ db.query(
 SELECT
 ksf_id,
 created_at,
-updated_at
+last_access_at
 FROM ksf_users
 ORDER BY created_at DESC
 LIMIT 10
@@ -463,7 +454,7 @@ user.ksf_id
 createdAt:
 user.created_at,
 lastAccess:
-user.updated_at || null
+user.last_access_at || null
 })
 );
 
@@ -550,7 +541,7 @@ await db.query(
 SELECT
 ksf_id,
 created_at,
-updated_at
+last_access_at
 FROM ksf_users
 ${where}
 ORDER BY created_at DESC
@@ -580,7 +571,7 @@ user.ksf_id
 createdAt:
 user.created_at,
 lastAccess:
-user.updated_at || null
+user.last_access_at || null
 })
 )
 });
@@ -639,6 +630,50 @@ new Map();
 
 const AUTH_SESSION_DURATION_MS =
 1000 * 60 * 60 * 24 * 30;
+
+const USER_ONLINE_WINDOW_MS =
+1000 * 60 * 2;
+
+const userPresence =
+new Map();
+
+function markUserPresence(
+ksfId
+) {
+if (!ksfId) {
+return;
+}
+
+userPresence.set(
+ksfId,
+Date.now()
+);
+}
+
+function getOnlineKsfIds() {
+const now =
+Date.now();
+
+const ids =
+new Set();
+
+for (
+const [ksfId, lastSeenAt]
+of userPresence.entries()
+) {
+if (
+now - lastSeenAt <=
+USER_ONLINE_WINDOW_MS
+) {
+ids.add(ksfId);
+}
+else {
+userPresence.delete(ksfId);
+}
+}
+
+return ids;
+}
 
 function createAuthSession(
 ksfId
@@ -737,6 +772,10 @@ message:
 
 req.authSession =
 session;
+
+markUserPresence(
+session.ksfId
+);
 
 next();
 }
@@ -1033,6 +1072,21 @@ createAuthSession(
 user.ksf_id
 );
 
+markUserPresence(
+user.ksf_id
+);
+
+await db.query(
+`
+UPDATE ksf_users
+SET last_access_at = NOW()
+WHERE ksf_id = $1
+`,
+[
+user.ksf_id
+]
+);
+
 console.log(
 "Login realizado:",
 user.ksf_id
@@ -1167,9 +1221,27 @@ app.post(
 "/api/auth/logout",
 requireAuthSession,
 (req, res) => {
+const ksfId =
+req.authSession.ksfId;
+
 authSessions.delete(
 req.authSession.token
 );
+
+const hasAnotherSession =
+Array.from(
+authSessions.values()
+).some(
+session =>
+session.ksfId === ksfId &&
+session.expiresAt > Date.now()
+);
+
+if (!hasAnotherSession) {
+userPresence.delete(
+ksfId
+);
+}
 
 return res
 .status(200)
