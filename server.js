@@ -637,6 +637,12 @@ const USER_ONLINE_WINDOW_MS =
 const userPresence =
 new Map();
 
+const userLastAccessPersisted =
+new Map();
+
+const USER_LAST_ACCESS_UPDATE_MS =
+30 * 1000;
+
 function markUserPresence(
 ksfId
 ) {
@@ -644,10 +650,51 @@ if (!ksfId) {
 return;
 }
 
+const now =
+Date.now();
+
 userPresence.set(
 ksfId,
-Date.now()
+now
 );
+
+const lastPersistedAt =
+userLastAccessPersisted.get(
+ksfId
+) || 0;
+
+if (
+db &&
+now - lastPersistedAt >=
+USER_LAST_ACCESS_UPDATE_MS
+) {
+userLastAccessPersisted.set(
+ksfId,
+now
+);
+
+db.query(
+`
+UPDATE ksf_users
+SET last_access_at = NOW()
+WHERE ksf_id = $1
+`,
+[
+ksfId
+]
+).catch(
+error => {
+console.error(
+"Erro ao atualizar último acesso:",
+error.message
+);
+
+userLastAccessPersisted.delete(
+ksfId
+);
+}
+);
+}
 }
 
 function getOnlineKsfIds() {
